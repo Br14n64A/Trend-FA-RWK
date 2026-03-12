@@ -283,10 +283,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnToggleEdit = document.getElementById('btnToggleEdit');
     if (btnToggleEdit) {
         btnToggleEdit.addEventListener('click', () => {
-            isEditMode = !isEditMode;
-            btnToggleEdit.textContent = isEditMode ? '💾 Finalizar Edición' : '✏️ Modo Edición';
-            btnToggleEdit.classList.toggle('active', isEditMode);
-            renderSummaryTable();
+            if (!isEditMode) {
+                // Solicitar clave para entrar a modo edición
+                const pass = prompt('Ingrese clave de administrador para editar:');
+                if (pass === 'admin123') { // Cambia esto por tu clave deseada
+                    isEditMode = true;
+                    btnToggleEdit.classList.add('active');
+                    btnToggleEdit.innerHTML = '✅ Guardar Cambios';
+                    renderSummaryTable();
+                    updateStatus('Modo Edición ACTIVADO', 'info');
+                } else {
+                    alert('Clave incorrecta. Solo administradores pueden editar.');
+                }
+            } else {
+                isEditMode = false;
+                btnToggleEdit.classList.remove('active');
+                btnToggleEdit.innerHTML = '✏️ Modo Edición';
+                renderSummaryTable();
+                updateStatus('Cambios guardados', 'success');
+            }
         });
     }
 });
@@ -739,14 +754,14 @@ function renderGolesTable(golesData) {
         const colorPass = `hsl(${Math.min(140, parseFloat(pctPass) * 1.4)}, 100%, 70%)`;
 
         html += `<tr>
-            <td>${goal.description}</td>
-            <td>${goal.date}</td>
-            <td class="val-col">${goal.rwk}</td>
-            <td class="pct-col" style="background-color: ${colorRwk}; color: #1e293b; font-weight: 700;">${pctRwk}%</td>
-            <td class="val-col">${goal.wip}</td>
-            <td class="pct-col" style="background-color: ${colorWip}; color: #1e293b; font-weight: 700;">${pctWip}%</td>
-            <td class="val-col">${goal.pass}</td>
-            <td class="pct-col" style="background-color: ${colorPass}; color: #1e293b; font-weight: 700;">${pctPass}%</td>
+            <td data-label="DESCRIPCIÓN">${goal.description}</td>
+            <td data-label="FECHA">${goal.date}</td>
+            <td class="val-col" data-label="RWK">${goal.rwk}</td>
+            <td class="pct-col" data-label="RWK %" style="background-color: ${colorRwk}; color: #1e293b; font-weight: 700;">${pctRwk}%</td>
+            <td class="val-col" data-label="WIP">${goal.wip}</td>
+            <td class="pct-col" data-label="WIP %" style="background-color: ${colorWip}; color: #1e293b; font-weight: 700;">${pctWip}%</td>
+            <td class="val-col" data-label="PASS">${goal.pass}</td>
+            <td class="pct-col" data-label="PASS %" style="background-color: ${colorPass}; color: #1e293b; font-weight: 700;">${pctPass}%</td>
         </tr>`;
     });
 
@@ -763,13 +778,13 @@ function renderGolesTable(golesData) {
         const colorGPass = `hsl(${Math.min(140, parseFloat(gPctPass) * 1.4)}, 100%, 70%)`;
 
         foot.innerHTML = `<tr class="total-row">
-            <td colspan="2">Total General (Producción Total)</td>
-            <td class="val-col">${totalRwk}</td>
-            <td class="pct-col" style="background-color: ${colorGRwk}; color: #1e293b; font-weight: 800;">${gPctRwk}%</td>
-            <td class="val-col">${totalWip}</td>
-            <td class="pct-col" style="background-color: ${colorGWip}; color: #1e293b; font-weight: 800;">${gPctWip}%</td>
-            <td class="val-col">${totalPass}</td>
-            <td class="pct-col" style="background-color: ${colorGPass}; color: #1e293b; font-weight: 800;">${gPctPass}%</td>
+            <td colspan="2" data-label="TOTAL GENERAL">Total General (Producción Total)</td>
+            <td class="val-col" data-label="RWK">${totalRwk}</td>
+            <td class="pct-col" data-label="RWK %" style="background-color: ${colorGRwk}; color: #1e293b; font-weight: 800;">${gPctRwk}%</td>
+            <td class="val-col" data-label="WIP">${totalWip}</td>
+            <td class="pct-col" data-label="WIP %" style="background-color: ${colorGWip}; color: #1e293b; font-weight: 800;">${gPctWip}%</td>
+            <td class="val-col" data-label="PASS">${totalPass}</td>
+            <td class="pct-col" data-label="PASS %" style="background-color: ${colorGPass}; color: #1e293b; font-weight: 800;">${gPctPass}%</td>
         </tr>`;
     } else {
         foot.innerHTML = "";
@@ -1362,32 +1377,34 @@ function renderSummaryTable() {
         let prevClass = (typeof prevRaw === 'object') ? (prevRaw.trend || "") : "";
         let lastVal = prevVal;
 
-        let rowHtml = WEEK_DAYS.map(d => {
-            const count = stored.data[cat][d] !== undefined ? stored.data[cat][d] : 0;
+        let rowHtml = `<tr><td class="model-col" data-label="MODELO">${cat}</td>`;
+
+        if (isEditMode) {
+            rowHtml += `<td data-label="VIE ANT"><input type="number" class="edit-input" value="${prevVal}" onchange="updateManualSummary('${cat}', 'PREV', this.value)"></td>`;
+        } else {
+            rowHtml += `<td class="${prevClass}" data-label="VIE ANT">${prevVal}</td>`;
+        }
+
+        WEEK_DAYS.forEach(d => {
+            const count = (stored.data[cat] && stored.data[cat][d] !== undefined) ? stored.data[cat][d] : 0;
             if (isEditMode) {
-                return `<td><input type="number" class="edit-input" value="${count}" onchange="updateManualSummary('${cat}', '${d}', this.value)"></td>`;
+                rowHtml += `<td data-label="${d}"><input type="number" class="edit-input" value="${count}" onchange="updateManualSummary('${cat}', '${d}', this.value)"></td>`;
+            } else {
+                let trendClass = getTrendClass(count, lastVal);
+                lastVal = count;
+                rowHtml += `<td class="${trendClass}" data-label="${d}">${count}</td>`;
             }
-            let trendClass = getTrendClass(count, lastVal);
-            lastVal = count;
-            return `<td class="${trendClass}">${count}</td>`;
-        }).join('');
+        });
 
-        let prevDisplay = isEditMode 
-            ? `<td><input type="number" class="edit-input" value="${prevVal}" onchange="updateManualSummary('${cat}', 'PREV', this.value)"></td>`
-            : `<td class="${prevClass}">${prevVal}</td>`;
-
-        html += `<tr>
-            <td class="model-col">${cat}</td>
-            ${prevDisplay}
-            ${rowHtml}
-        </tr>`;
+        rowHtml += `</tr>`;
+        html += rowHtml;
     });
 
     // 2. Total Row (AT BOTTOM)
     html += `<tr class="total-row">
-        <td class="model-col">TOTAL</td>
-        <td>${grandPrevTotal}</td>
-        ${WEEK_DAYS.map(d => `<td>${totalsByDay[d]}</td>`).join('')}
+        <td class="model-col" data-label="TOTAL">TOTAL</td>
+        <td data-label="VIE ANT">${grandPrevTotal}</td>
+        ${WEEK_DAYS.map(d => `<td data-label="${d}">${totalsByDay[d]}</td>`).join('')}
     </tr>`;
 
     body.innerHTML = html;

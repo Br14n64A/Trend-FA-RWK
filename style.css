@@ -624,9 +624,81 @@ tr:hover td {
     background: #f8fafc;
 }
 
-@media (max-width: 1100px) {
-    .first-content-layout {
-        grid-template-columns: 1fr;
+@media (max-width: 768px) {
+    /* ... existing mobile styles ... */
+
+    /* Table to Card Transformation */
+    .summary-table, .goles-table, .summary-table thead, .summary-table tbody, .summary-table th, .summary-table td, .summary-table tr,
+    .goles-table thead, .goles-table tbody, .goles-table th, .goles-table td, .goles-table tr {
+        display: block;
+    }
+
+    .summary-table thead tr, .goles-table thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    .summary-table tr, .goles-table tr {
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+
+    .summary-table td, .goles-table td {
+        border: none;
+        border-bottom: 1px solid #f1f5f9;
+        position: relative;
+        padding-left: 50% !important;
+        text-align: right !important;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .summary-table td:last-child, .goles-table td:last-child {
+        border-bottom: none;
+    }
+
+    .summary-table td::before, .goles-table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 1rem;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+        text-align: left;
+        font-weight: 700;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+
+    .summary-table .model-col, .goles-table td:first-child {
+        background: #f8fafc !important;
+        font-weight: 800;
+        color: var(--accent-primary);
+        justify-content: center;
+        padding-left: 1rem !important;
+        text-align: center !important;
+    }
+
+    .summary-table .model-col::before, .goles-table td:first-child::before {
+        display: none;
+    }
+
+    .total-row {
+        background: #e2e8f0 !important;
+        border: 2px solid var(--accent-primary) !important;
+    }
+
+    .edit-input {
+        width: 100%;
+        max-width: 150px;
     }
 }
 
