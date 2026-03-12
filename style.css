@@ -627,79 +627,66 @@ tr:hover td {
 @media (max-width: 768px) {
     /* ... existing mobile styles ... */
 
-    /* Table to Card Transformation */
-    .summary-table, .goles-table, .summary-table thead, .summary-table tbody, .summary-table th, .summary-table td, .summary-table tr,
-    .goles-table thead, .goles-table tbody, .goles-table th, .goles-table td, .goles-table tr {
-        display: block;
+    /* Mantener tablas en modo horizontal con scroll si es necesario */
+    .summary-table-container, .goles-table-container {
+        -webkit-overflow-scrolling: touch;
     }
 
-    .summary-table thead tr, .goles-table thead tr {
-        position: absolute;
-        top: -9999px;
-        left: -9999px;
+    .summary-table, .goles-table {
+        display: table !important;
+        min-width: 600px; /* Asegurar un ancho mínimo para que sea legible al scrollear */
+    }
+
+    .summary-table thead, .goles-table thead {
+        display: table-header-group !important;
+        position: static !important;
+    }
+
+    .summary-table tbody, .goles-table tbody {
+        display: table-row-group !important;
     }
 
     .summary-table tr, .goles-table tr {
-        margin-bottom: 1.5rem;
-        border: 1px solid var(--glass-border);
-        border-radius: 12px;
-        background: white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        overflow: hidden;
+        display: table-row !important;
+        margin-bottom: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
     }
 
     .summary-table td, .goles-table td {
-        border: none;
-        border-bottom: 1px solid #f1f5f9;
-        position: relative;
-        padding-left: 50% !important;
-        text-align: right !important;
-        min-height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-    }
-
-    .summary-table td:last-child, .goles-table td:last-child {
-        border-bottom: none;
+        display: table-cell !important;
+        padding: 0.5rem !important;
+        text-align: center !important;
+        position: static !important;
+        border-bottom: 1px solid var(--glass-border) !important;
+        width: auto !important;
     }
 
     .summary-table td::before, .goles-table td::before {
-        content: attr(data-label);
-        position: absolute;
-        left: 1rem;
-        width: 45%;
-        padding-right: 10px;
-        white-space: nowrap;
-        text-align: left;
-        font-weight: 700;
-        color: var(--text-secondary);
-        font-size: 0.75rem;
-        text-transform: uppercase;
+        display: none !important;
     }
 
     .summary-table .model-col, .goles-table td:first-child {
-        background: #f8fafc !important;
-        font-weight: 800;
-        color: var(--accent-primary);
-        justify-content: center;
-        padding-left: 1rem !important;
-        text-align: center !important;
+        position: sticky !important;
+        left: 0;
+        z-index: 5;
+        background: #f1f5f9 !important;
+        text-align: left !important;
+        min-width: 120px !important;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.05);
     }
 
-    .summary-table .model-col::before, .goles-table td:first-child::before {
-        display: none;
+    .summary-table th:first-child, .goles-table th:first-child {
+        position: sticky !important;
+        left: 0;
+        top: 0;
+        z-index: 20;
+        background: #94a3b8 !important; /* Color gris oscuro para cabecera fija */
+        color: white !important;
     }
 
-    .total-row {
-        background: #e2e8f0 !important;
-        border: 2px solid var(--accent-primary) !important;
-    }
 
-    .edit-input {
-        width: 100%;
-        max-width: 150px;
-    }
 }
 
 /* Mobile Responsiveness */
