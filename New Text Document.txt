@@ -1,0 +1,1 @@
+fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap:1   Failed to load resource: net::ERR_CERT_AUTHORITY_INVALID
