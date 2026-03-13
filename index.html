@@ -7,10 +7,21 @@
     <title>PCBA Status Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <script src="chart.js"></script>
-    <script src="xlsx.full.min.js"></script>
-    <script src="exceljs.min.js"></script>
+    
+    <!-- External Libraries (CDNs for reliability) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
     <script src="https://unpkg.com/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    
+    <script>
+        window.addEventListener('load', () => {
+            if (typeof Chart === 'undefined') console.error('FAILED TO LOAD: Chart.js');
+            if (typeof XLSX === 'undefined') console.error('FAILED TO LOAD: SheetJS (XLSX)');
+            if (typeof ExcelJS === 'undefined') console.error('FAILED TO LOAD: ExcelJS');
+            if (typeof PptxGenJS === 'undefined') console.error('FAILED TO LOAD: PptxGenJS');
+        });
+    </script>
 </head>
 
 <body>
