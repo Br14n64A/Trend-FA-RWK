@@ -201,8 +201,9 @@ function getCategory(rawModel) {
         return "OTHER";
     }
 
-    if (SERIAL_TO_CATEGORY[trimmed]) {
-        return SERIAL_TO_CATEGORY[trimmed];
+    const upperTrimmed = trimmed.toUpperCase();
+    if (SERIAL_TO_CATEGORY[upperTrimmed]) {
+        return SERIAL_TO_CATEGORY[upperTrimmed];
     }
 
     // Fallback logic by name keyword matching
