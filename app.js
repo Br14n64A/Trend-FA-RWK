@@ -123,6 +123,7 @@ const SERIAL_TO_CATEGORY = {
     "1A6289D00-600-G": "MB",
     // NOGA
     "1A72BE200-600-G": "NOGA",
+    "1A72BE300-600-G": "NOGA",
     "1A72BED00-600-G": "NOGA",
     "1A722A000-600-G": "NOGA",
     // MOBO
@@ -205,21 +206,24 @@ function getCategory(rawModel) {
     }
 
     // Fallback logic by name keyword matching
-    const descriptiveName = getMappedName(rawModel).toUpperCase();
-    if (descriptiveName.includes("NOGA") || descriptiveName.includes("MAKALU MB")) return "NOGA";
-    if (descriptiveName.includes("JUPITER")) return "JUPITER";
-    if (descriptiveName.includes("CORDITE")) return "CORDITE";
-    if (descriptiveName.includes("MAKALU MP") || descriptiveName.includes("MIDPLANE")) return "MIDPLANE";
-    if (descriptiveName.includes("UC MODULE") || descriptiveName.includes("UC_MODULE")) return "UC Module";
-    if (descriptiveName.includes("RISER")) return "RISER";
-    if (descriptiveName.includes("SSD")) return "SSD";
-    if (descriptiveName.includes("MOBO")) return "MOBO";
-    if (descriptiveName.includes("UPDB")) return "UPDB";
-    if (descriptiveName.includes("SPARROW") || descriptiveName.includes("MB") || descriptiveName.includes("SWAN") || descriptiveName.includes("TPM")) return "MB";
+    const mappedName = getMappedName(rawModel).toUpperCase();
+    
+    if (mappedName.includes("NOGA") || mappedName.includes("MAKALU MB")) return "NOGA";
+    if (mappedName.includes("JUPITER")) return "JUPITER";
+    if (mappedName.includes("CORDITE")) return "CORDITE";
+    if (mappedName.includes("MAKALU MP") || mappedName.includes("MIDPLANE")) return "MIDPLANE";
+    if (mappedName.includes("UC MODULE") || mappedName.includes("UC_MODULE")) return "UC Module";
+    if (mappedName.includes("RISER")) return "RISER";
+    if (mappedName.includes("SSD")) return "SSD";
+    if (mappedName.includes("MOBO")) return "MOBO";
+    if (mappedName.includes("UPDB")) return "UPDB";
+    if (mappedName.includes("SPARROW") || mappedName.includes("MB") || mappedName.includes("SWAN") || mappedName.includes("TPM")) return "MB";
 
-    if (descriptiveName !== 'UNKNOWN') {
-        console.warn(`[getCategory] Model not categorized: ${rawModel} (${descriptiveName})`);
+    if (mappedName !== 'UNKNOWN' && mappedName !== trimmed.toUpperCase()) {
+        console.warn(`[getCategory] Model not categorized: ${rawModel} (${mappedName})`);
     }
+    
+    // If it's a model number but not in our list, try to return its base name
     return "OTHER";
 }
 
@@ -539,9 +543,13 @@ function handleFileUpload(e) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
 
-            // 1. PCBA_Status_AWS_OPEN_N-SHIPPING
-            const statusSheet = workbook.Sheets["PCBA_Status_AWS_OPEN_N-SHIPPING"] || workbook.Sheets[workbook.SheetNames[0]];
+            // 1. Sheet 1 / Hoja 1 (PCBA_Status_AWS_OPEN_N-SHIPPING)
+            const h1Name = workbook.SheetNames.find(n => n.toUpperCase().includes("HOJA 1")) || 
+                           workbook.SheetNames.find(n => n.toUpperCase().includes("STATUS")) || 
+                           workbook.SheetNames[0];
+            const statusSheet = workbook.Sheets[h1Name];
             const statusRows = XLSX.utils.sheet_to_json(statusSheet, { header: 1 });
+            
             if (statusRows.length > 1) {
                 headers = statusRows[0];
                 rawData = statusRows.slice(1);
@@ -573,7 +581,9 @@ function handleFileUpload(e) {
                 firstData = processFirst(rows);
             }
 
-            const sheet2 = workbook.Sheets[workbook.SheetNames[1]];
+            // 5. SECONS (Hoja 2)
+            const h2Name = workbook.SheetNames.find(n => n.toUpperCase().includes("HOJA 2")) || workbook.SheetNames[1];
+            const sheet2 = workbook.Sheets[h2Name];
             let seconsData = {};
             if (sheet2 && statusRows.length > 1) {
                 const sheet2Rows = XLSX.utils.sheet_to_json(sheet2, { header: 1 });
@@ -873,7 +883,11 @@ function renderDashboard(entradasData, salidasData, firstData, seconsData) {
     if (entradasData) renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal");
     // Salidas: Model Serial is Column C (index 2)
     if (salidasData) renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal");
-    if (firstData) renderFirstChart("firstChart", firstData);
+    
+    // Pass seconsDetails to firstChart for tooltips if available
+    const seconsDetails = seconsData ? seconsData.details : null;
+    if (firstData) renderFirstChart("firstChart", firstData, seconsDetails);
+    
     if (seconsData) renderSecondsChart(seconsData);
 }
 
@@ -961,10 +975,9 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
     });
 }
 
-function renderFirstChart(canvasId, data) {
+function renderFirstChart(canvasId, data, seconsDetails = null) {
     // Column J (index 9) is Component, Column C (index 2) is Model
     const componentModelCounts = {};
-    const componentModelDetails = {}; // For tooltips
     const components = new Set();
     const models = new Set();
     let grandTotal = 0;
@@ -973,7 +986,6 @@ function renderFirstChart(canvasId, data) {
         const component = String(row[9] || 'Unknown').trim();
         const rawModel = String(row[2] || 'Unknown').trim();
         const model = getCategory(rawModel);
-        const errorCode = String(row[5] || 'N/A').trim(); // Column F (index 5)
 
         if (model !== "OTHER") {
             components.add(component);
@@ -981,10 +993,6 @@ function renderFirstChart(canvasId, data) {
 
             if (!componentModelCounts[component]) componentModelCounts[component] = {};
             componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
-
-            if (!componentModelDetails[component]) componentModelDetails[component] = {};
-            if (!componentModelDetails[component][model]) componentModelDetails[component][model] = {};
-            componentModelDetails[component][model][errorCode] = (componentModelDetails[component][model][errorCode] || 0) + 1;
 
             grandTotal++;
         }
@@ -1041,13 +1049,14 @@ function renderFirstChart(canvasId, data) {
                     callbacks: {
                         afterBody: (context) => {
                             const ctxItem = context[0];
-                            const component = ctxItem.label;
-                            const model = ctxItem.dataset.label;
-                            const details = componentModelDetails[component]?.[model];
-                            if (details) {
-                                const lines = ["Fallas (Col F):"];
-                                Object.entries(details).forEach(([code, count]) => {
-                                    lines.push(` • ${code}: ${count}`);
+                            const modelCategory = ctxItem.dataset.label;
+                            
+                            // Show Hoja 2 Col M info for this model category
+                            if (seconsDetails && seconsDetails[modelCategory]) {
+                                const details = seconsDetails[modelCategory];
+                                const lines = [`Info ${modelCategory} (Hoja 2 Col M):`];
+                                Object.entries(details).forEach(([val, count]) => {
+                                    lines.push(` • ${val}: ${count}`);
                                 });
                                 return lines;
                             }
@@ -1394,9 +1403,14 @@ function processSeconds(sheet1Rows, sheet2Rows) {
     // 1. Filter Sheet 1: Col F (index 5) == 0 AND Col H (index 7) > 1
     const filteredSheet1Serials = new Set();
     sheet1Data.forEach(row => {
-        const colF = parseFloat(row[5]);
-        const colH = parseFloat(row[7]);
-        if (colF === 0 && colH > 1) {
+        // Robust check for 0 (can be number 0, string "0", or formatted as "0.0")
+        const rawF = String(row[5] || '').trim();
+        const colF = parseFloat(rawF);
+        
+        const rawH = String(row[7] || '0').trim();
+        const colH = parseFloat(rawH);
+        
+        if ((rawF === "0" || colF === 0) && colH > 1) {
             const serial = String(row[0] || '').trim();
             if (serial) filteredSheet1Serials.add(serial);
         }
@@ -1411,6 +1425,9 @@ function processSeconds(sheet1Rows, sheet2Rows) {
         if (filteredSheet1Serials.has(serial)) {
             const rawModel = String(row[3] || 'Unknown').trim();
             const category = getCategory(rawModel);
+            
+            // If getCategory returned OTHER, it might be a model number we don't know.
+            // But for these charts, we usually only care about the primary categories.
             if (category === "OTHER") return;
             
             const detailM = String(row[12] || 'N/A').trim(); // Column M (index 12)
