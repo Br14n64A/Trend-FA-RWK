@@ -240,7 +240,8 @@ let charts = {
     entradas: null,
     salidas: null,
     first: null,
-    altoAging: null
+    altoAging: null,
+    secons: null
 };
 
 // Storage Structure: 
@@ -472,6 +473,10 @@ function restoreState() {
     if (stored.golesData && stored.golesData.length > 0) {
         renderGolesTable(stored.golesData);
     }
+
+    if (stored.seconsData && Object.keys(stored.seconsData).length > 0) {
+        renderSecondsChart(stored.seconsData);
+    }
 }
 
 function getWeekId(date = new Date()) {
@@ -568,7 +573,14 @@ function handleFileUpload(e) {
                 firstData = processFirst(rows);
             }
 
-            // 5. GOLES (Search by name "GOLES" or index 4)
+            const sheet2 = workbook.Sheets[workbook.SheetNames[1]];
+            let seconsData = {};
+            if (sheet2 && statusRows.length > 1) {
+                const sheet2Rows = XLSX.utils.sheet_to_json(sheet2, { header: 1 });
+                seconsData = processSeconds(statusRows, sheet2Rows);
+            }
+
+            // 6. GOLES (Search by name "GOLES" or index 4)
             let golesSheetName = workbook.SheetNames.find(n => n.trim().toUpperCase() === "GOLES");
 
             // If not found by name, try common variations or fallback to index 4
@@ -595,7 +607,7 @@ function handleFileUpload(e) {
             const altoAgingData = processAltoAging(statusRows, mrbRows);
             renderAltoAgingChart(altoAgingData);
 
-            renderDashboard(entradasData, salidasData, firstData);
+            renderDashboard(entradasData, salidasData, firstData, seconsData);
             if (golesData.length > 0) {
                 renderGolesTable(golesData);
             }
@@ -607,6 +619,7 @@ function handleFileUpload(e) {
             stored.firstData = firstData;
             stored.golesData = golesData;
             stored.altoAgingData = altoAgingData;
+            stored.seconsData = seconsData;
             saveStateToServer();
 
             updateStatus('File processed successfully', 'success');
@@ -661,11 +674,22 @@ function processSalidas(rows) {
 function processFirst(rows) {
     if (rows.length < 2) return [];
     const data = rows.slice(1);
-    // Filter out Column J (index 9) contains "N/A" or "MISJUDGE"
-    return data.filter(row => {
-        const val = String(row[9] || '').toUpperCase();
-        return !val.includes("N/A") && !val.includes("MISJUDGE");
+    const unique = [];
+    const seen = new Set();
+
+    data.forEach(row => {
+        const colD = String(row[3] || '').trim(); // Column D
+        const valJ = String(row[9] || '').toUpperCase(); // Column J
+
+        const passesJ = !valJ.includes("N/A") && !valJ.includes("MISJUDGE");
+        const passesD = colD !== '' && colD.toUpperCase() !== 'N/A';
+
+        if (passesJ && passesD && !seen.has(colD)) {
+            seen.add(colD);
+            unique.push(row);
+        }
     });
+    return unique;
 }
 
 function processGoles(rows) {
@@ -843,13 +867,14 @@ function updateAccumulatedData() {
     saveStateToServer();
 }
 
-function renderDashboard(entradasData, salidasData, firstData) {
+function renderDashboard(entradasData, salidasData, firstData, seconsData) {
     renderSummaryTable();
     // Entradas: Model Serial is Column D (index 3)
     if (entradasData) renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal");
     // Salidas: Model Serial is Column C (index 2)
     if (salidasData) renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal");
     if (firstData) renderFirstChart("firstChart", firstData);
+    if (seconsData) renderSecondsChart(seconsData);
 }
 
 function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, totalElementId) {
@@ -1330,6 +1355,106 @@ function renderAltoAgingChart(data) {
                     ctx.fillText(label, posX, topY - padY);
                 });
                 ctx.restore();
+            }
+        }]
+    });
+}
+
+function processSeconds(sheet1Rows, sheet2Rows) {
+    if (!sheet1Rows || sheet1Rows.length < 2 || !sheet2Rows || sheet2Rows.length < 2) return {};
+
+    const sheet1Data = sheet1Rows.slice(1);
+    const sheet2Data = sheet2Rows.slice(1);
+
+    // 1. Filter Sheet 1: Col F (index 5) == 0 AND Col H (index 7) > 1
+    const filteredSheet1Serials = new Set();
+    sheet1Data.forEach(row => {
+        const colF = parseFloat(row[5]);
+        const colH = parseFloat(row[7]);
+        if (colF === 0 && colH > 1) {
+            const serial = String(row[0] || '').trim();
+            if (serial) filteredSheet1Serials.add(serial);
+        }
+    });
+
+    // 2. Match with Sheet 2 and extract Col D (index 3) and Col I (index 8)
+    const modelData = {};
+    sheet2Data.forEach(row => {
+        const serial = String(row[0] || '').trim();
+        if (filteredSheet1Serials.has(serial)) {
+            const model = String(row[3] || 'Unknown').trim();
+            // Try to use Col I as a value, if not possible fallback to 1 (counting)
+            let valI = parseFloat(row[8]);
+            if (isNaN(valI)) valI = 1;
+            
+            modelData[model] = (modelData[model] || 0) + valI;
+        }
+    });
+
+    return modelData;
+}
+
+function renderSecondsChart(data) {
+    const canvas = document.getElementById('seconsChart');
+    if (!canvas) return;
+
+    const labels = Object.keys(data).sort((a, b) => data[b] - data[a]);
+    const values = labels.map(l => data[l]);
+    const grandTotal = values.reduce((s, v) => s + v, 0);
+
+    const totalEl = document.getElementById('seconsTotal');
+    if (totalEl) totalEl.textContent = `Total: ${grandTotal.toFixed(0)}`;
+
+    const ctx = canvas.getContext('2d');
+    if (charts.secons) charts.secons.destroy();
+
+    charts.secons = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'SECONDS Value',
+                data: values,
+                backgroundColor: '#f472b6',
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                    ticks: { color: '#94a3b8' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8' }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        },
+        plugins: [{
+            id: 'seconsLabelsPlugin',
+            afterDraw: (chart) => {
+                const ctx = chart.ctx;
+                ctx.font = 'bold 12px Outfit';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillStyle = '#f8fafc';
+
+                chart.data.datasets.forEach((dataset, i) => {
+                    const meta = chart.getDatasetMeta(i);
+                    meta.data.forEach((bar, index) => {
+                        const dataVal = dataset.data[index];
+                        if (dataVal > 0 && !meta.hidden) {
+                            ctx.fillText(dataVal.toFixed(0), bar.x, bar.y - 5);
+                        }
+                    });
+                });
             }
         }]
     });
