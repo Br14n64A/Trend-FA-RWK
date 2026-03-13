@@ -964,6 +964,7 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
 function renderFirstChart(canvasId, data) {
     // Column J (index 9) is Component, Column C (index 2) is Model
     const componentModelCounts = {};
+    const componentModelDetails = {}; // For tooltips
     const components = new Set();
     const models = new Set();
     let grandTotal = 0;
@@ -971,7 +972,8 @@ function renderFirstChart(canvasId, data) {
     data.forEach(row => {
         const component = String(row[9] || 'Unknown').trim();
         const rawModel = String(row[2] || 'Unknown').trim();
-        const model = getCategory(rawModel); // Use category instead of raw model
+        const model = getCategory(rawModel);
+        const errorCode = String(row[5] || 'N/A').trim(); // Column F (index 5)
 
         if (model !== "OTHER") {
             components.add(component);
@@ -979,6 +981,11 @@ function renderFirstChart(canvasId, data) {
 
             if (!componentModelCounts[component]) componentModelCounts[component] = {};
             componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
+
+            if (!componentModelDetails[component]) componentModelDetails[component] = {};
+            if (!componentModelDetails[component][model]) componentModelDetails[component][model] = {};
+            componentModelDetails[component][model][errorCode] = (componentModelDetails[component][model][errorCode] || 0) + 1;
+
             grandTotal++;
         }
     });
@@ -1029,6 +1036,24 @@ function renderFirstChart(canvasId, data) {
                 legend: {
                     position: 'top',
                     labels: { color: '#94a3b8', font: { size: 10, family: 'Outfit' } }
+                },
+                tooltip: {
+                    callbacks: {
+                        afterBody: (context) => {
+                            const ctxItem = context[0];
+                            const component = ctxItem.label;
+                            const model = ctxItem.dataset.label;
+                            const details = componentModelDetails[component]?.[model];
+                            if (details) {
+                                const lines = ["Fallas (Col F):"];
+                                Object.entries(details).forEach(([code, count]) => {
+                                    lines.push(` • ${code}: ${count}`);
+                                });
+                                return lines;
+                            }
+                            return "";
+                        }
+                    }
                 }
             },
         },
@@ -1379,27 +1404,41 @@ function processSeconds(sheet1Rows, sheet2Rows) {
 
     // 2. Match with Sheet 2 and extract Col D (index 3) and Col I (index 8)
     const modelData = {};
+    const modelDetails = {}; // Details for Tooltips (Column M)
+    
     sheet2Data.forEach(row => {
         const serial = String(row[0] || '').trim();
         if (filteredSheet1Serials.has(serial)) {
-            const model = String(row[3] || 'Unknown').trim();
+            const rawModel = String(row[3] || 'Unknown').trim();
+            const category = getCategory(rawModel);
+            if (category === "OTHER") return;
+            
+            const detailM = String(row[12] || 'N/A').trim(); // Column M (index 12)
+            
             // Try to use Col I as a value, if not possible fallback to 1 (counting)
             let valI = parseFloat(row[8]);
             if (isNaN(valI)) valI = 1;
             
-            modelData[model] = (modelData[model] || 0) + valI;
+            modelData[category] = (modelData[category] || 0) + valI;
+            
+            if (!modelDetails[category]) modelDetails[category] = {};
+            modelDetails[category][detailM] = (modelDetails[category][detailM] || 0) + 1;
         }
     });
 
-    return modelData;
+    return { counts: modelData, details: modelDetails };
 }
 
 function renderSecondsChart(data) {
     const canvas = document.getElementById('seconsChart');
     if (!canvas) return;
 
-    const labels = Object.keys(data).sort((a, b) => data[b] - data[a]);
-    const values = labels.map(l => data[l]);
+    // Handle both old format and new format with details
+    const counts = data.counts || data;
+    const details = data.details || {};
+
+    const labels = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const values = labels.map(l => counts[l]);
     const grandTotal = values.reduce((s, v) => s + v, 0);
 
     const totalEl = document.getElementById('seconsTotal');
@@ -1434,7 +1473,23 @@ function renderSecondsChart(data) {
                 }
             },
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        afterBody: (context) => {
+                            const category = context[0].label;
+                            const catDetails = details[category];
+                            if (catDetails) {
+                                const lines = ["Info (Col M):"];
+                                Object.entries(catDetails).forEach(([val, count]) => {
+                                    lines.push(` • ${val}: ${count}`);
+                                });
+                                return lines;
+                            }
+                            return "";
+                        }
+                    }
+                }
             }
         },
         plugins: [{
