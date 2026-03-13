@@ -1395,51 +1395,37 @@ function renderAltoAgingChart(data) {
 }
 
 function processSeconds(sheet1Rows, sheet2Rows) {
-    if (!sheet1Rows || sheet1Rows.length < 2 || !sheet2Rows || sheet2Rows.length < 2) return {};
+    if (!sheet2Rows || sheet2Rows.length < 2) return { counts: {}, details: {} };
 
-    const sheet1Data = sheet1Rows.slice(1);
     const sheet2Data = sheet2Rows.slice(1);
-
-    // 1. Filter Sheet 1: Col F (index 5) == 0 AND Col H (index 7) > 1
-    const filteredSheet1Serials = new Set();
-    sheet1Data.forEach(row => {
-        // Robust check for 0 (can be number 0, string "0", or formatted as "0.0")
-        const rawF = String(row[5] || '').trim();
-        const colF = parseFloat(rawF);
-        
-        const rawH = String(row[7] || '0').trim();
-        const colH = parseFloat(rawH);
-        
-        if ((rawF === "0" || colF === 0) && colH > 1) {
-            const serial = String(row[0] || '').trim();
-            if (serial) filteredSheet1Serials.add(serial);
-        }
-    });
-
-    // 2. Match with Sheet 2 and extract Col D (index 3) and Col I (index 8)
     const modelData = {};
-    const modelDetails = {}; // Details for Tooltips (Column M)
+    const modelDetails = {}; 
     
     sheet2Data.forEach(row => {
-        const serial = String(row[0] || '').trim();
-        if (filteredSheet1Serials.has(serial)) {
-            const rawModel = String(row[3] || 'Unknown').trim();
+        // Col Q (index 16) == 0 AND Col R (index 17) > 0
+        const rawQ = String(row[16] || '').trim();
+        const colQ = parseFloat(rawQ);
+        const rawR = String(row[17] || '0').trim();
+        const colR = parseFloat(rawR);
+
+        if ((rawQ === "0" || colQ === 0) && colR > 0) {
+            const rawModel = String(row[3] || 'Unknown').trim(); // Col D
             const category = getCategory(rawModel);
-            
-            // If getCategory returned OTHER, it might be a model number we don't know.
-            // But for these charts, we usually only care about the primary categories.
             if (category === "OTHER") return;
             
-            const detailM = String(row[12] || 'N/A').trim(); // Column M (index 12)
+            // Value from Column M (index 12)
+            let valM = parseFloat(row[12]);
+            const isNumericM = !isNaN(valM);
+            const valToAdd = isNumericM ? valM : 1;
             
-            // Try to use Col I as a value, if not possible fallback to 1 (counting)
-            let valI = parseFloat(row[8]);
-            if (isNaN(valI)) valI = 1;
+            modelData[category] = (modelData[category] || 0) + valToAdd;
             
-            modelData[category] = (modelData[category] || 0) + valI;
+            // Details for Tooltips: Show serial (Col A) and the value from M
+            const serial = String(row[0] || 'N/A').trim();
+            const detailLabel = isNumericM ? `Serial: ${serial}` : String(row[12] || 'N/A').trim();
             
             if (!modelDetails[category]) modelDetails[category] = {};
-            modelDetails[category][detailM] = (modelDetails[category][detailM] || 0) + 1;
+            modelDetails[category][detailLabel] = (modelDetails[category][detailLabel] || 0) + valToAdd;
         }
     });
 
