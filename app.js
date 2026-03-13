@@ -104,7 +104,7 @@ const MODEL_MAP = {
     "1A728J700-600-G": "CORDITE S1"
 };
 
-const CATEGORIES = ["MB", "NOGA", "JUPITER", "CORDITE", "MIDPLANE", "UC Module", "RISER", "SSD"];
+const CATEGORIES = ["MB", "NOGA", "JUPITER", "CORDITE", "UPDB", "MIDPLANE", "UC Module", "RISER", "SSD"];
 
 const AGING_CATEGORIES = [
     "MAYOR A 90", "80 A 89", "70 A 79", "60 A 69",
@@ -1505,6 +1505,15 @@ async function exportToPPT() {
         let pres = new PptxGenJS();
         pres.layout = 'LAYOUT_16x9';
 
+        // Ensure charts are visible so they can be captured with dimensions
+        const chartsView = document.getElementById('chartsView');
+        const wasHidden = chartsView && chartsView.classList.contains('hidden');
+        if (wasHidden) {
+            chartsView.classList.remove('hidden');
+            // Force a small delay or sync resize if needed
+            Object.values(charts).forEach(c => { if (c) c.resize(); });
+        }
+
         // Custom Colors
         const brandColor = 'e11d48'; // accent-primary
         const darkText = '0f172a';
@@ -1634,15 +1643,8 @@ async function exportToPPT() {
         }
 
         // --- SLIDE 6: GOLES ---
-        let slide5 = pres.addSlide();
-        slide5.addText('Seguimiento de Goles', {
-            x: 0.5, y: 0.5, w: '90%', h: 0.5,
-            fontSize: 24, bold: true, color: brandColor
-        });
-
         if (stored.golesData && stored.golesData.length > 0) {
-            const golesTable = [];
-            golesTable.push([
+            const golesHeaders = [
                 { text: 'Descripción', options: { fill: '94a3b8', bold: true, color: 'ffffff' } },
                 { text: 'Fecha', options: { fill: '94a3b8', bold: true, color: 'ffffff' } },
                 { text: 'RWK Cant', options: { fill: 'b91c1c', bold: true, color: 'ffffff' } },
@@ -1651,35 +1653,55 @@ async function exportToPPT() {
                 { text: 'WIP %', options: { fill: 'eab308', bold: true, color: 'ffffff' } },
                 { text: 'PASS Cant', options: { fill: '15803d', bold: true, color: 'ffffff' } },
                 { text: 'PASS %', options: { fill: '15803d', bold: true, color: 'ffffff' } }
-            ]);
+            ];
 
-            stored.golesData.forEach(g => {
+            const filteredGoles = stored.golesData.filter(g => {
                 const total = g.rwk + g.wip + g.pass;
-                if (total === 0) return;
-
-                // Solo mostrar en el reporte los que tienen menos del 100% PASS
-                const pctPassVal = (g.pass / total) * 100;
-                if (pctPassVal >= 100) return;
-
-                golesTable.push([
-                    g.description, g.date,
-                    g.rwk, { text: `${((g.rwk / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.max(0, 140 - ((g.rwk / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } },
-                    g.wip, { text: `${((g.wip / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.max(0, 140 - ((g.wip / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } },
-                    g.pass, { text: `${((g.pass / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.min(140, ((g.pass / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } }
-                ]);
+                return total > 0 && ((g.pass / total) * 100) < 100;
             });
 
-            if (golesTable.length > 1) { // More than just headers
-                slide5.addTable(golesTable, {
-                    x: 0.5, y: 1.2, w: 9,
-                    border: { type: 'solid', color: 'cbd5e1', pt: 1 },
-                    align: 'center', valign: 'middle', fontSize: 10
-                });
+            if (filteredGoles.length > 0) {
+                const ROWS_PER_SLIDE = 12;
+                for (let i = 0; i < filteredGoles.length; i += ROWS_PER_SLIDE) {
+                    let slideG = pres.addSlide();
+                    slideG.addText(i === 0 ? 'Seguimiento de Goles' : 'Seguimiento de Goles (Cont.)', {
+                        x: 0.5, y: 0.5, w: '90%', h: 0.5,
+                        fontSize: 24, bold: true, color: brandColor
+                    });
+
+                    const slideTable = [golesHeaders];
+                    const chunk = filteredGoles.slice(i, i + ROWS_PER_SLIDE);
+                    
+                    chunk.forEach(g => {
+                        const total = g.rwk + g.wip + g.pass;
+                        slideTable.push([
+                            g.description, g.date,
+                            g.rwk, { text: `${((g.rwk / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.max(0, 140 - ((g.rwk / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } },
+                            g.wip, { text: `${((g.wip / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.max(0, 140 - ((g.wip / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } },
+                            g.pass, { text: `${((g.pass / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.min(140, ((g.pass / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } }
+                        ]);
+                    });
+
+                    slideG.addTable(slideTable, {
+                        x: 0.5, y: 1.2, w: 9,
+                        border: { type: 'solid', color: 'cbd5e1', pt: 1 },
+                        align: 'center', valign: 'middle', fontSize: 10
+                    });
+                }
             } else {
-                slide5.addText('Todos los goles están al 100% PASS', { x: 0.5, y: 2, w: '90%', fontSize: 16 });
+                let slideEmpty = pres.addSlide();
+                slideEmpty.addText('Seguimiento de Goles', { x: 0.5, y: 0.5, w: '90%', h: 0.5, fontSize: 24, bold: true, color: brandColor });
+                slideEmpty.addText('Todos los goles están al 100% PASS', { x: 0.5, y: 2, w: '90%', fontSize: 16 });
             }
         } else {
-            slide5.addText('No hay datos de goles', { x: 0.5, y: 2, w: '90%', fontSize: 16 });
+            let slideNoData = pres.addSlide();
+            slideNoData.addText('Seguimiento de Goles', { x: 0.5, y: 0.5, w: '90%', h: 0.5, fontSize: 24, bold: true, color: brandColor });
+            slideNoData.addText('No hay datos de goles', { x: 0.5, y: 2, w: '90%', fontSize: 16 });
+        }
+
+        // Restore view visibility
+        if (wasHidden) {
+            chartsView.classList.add('hidden');
         }
 
         // Save presentation
