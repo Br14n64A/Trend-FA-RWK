@@ -230,6 +230,22 @@ function getCategory(rawModel) {
 
 const WEEK_DAYS = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
 
+// DIAS FESTIVOS (MEXICO) - Se pueden agregar más fechas según sea necesario
+const HOLIDAYS = [
+    "2024-01-01", "2024-02-05", "2024-03-18", "2024-05-01", "2024-09-16", "2024-11-18", "2024-12-25",
+    "2025-01-01", "2025-02-03", "2025-03-17", "2025-05-01", "2025-09-16", "2025-11-17", "2025-12-25",
+    "2026-01-01", "2026-02-02", "2026-03-16", "2026-05-01", "2026-09-16", "2026-11-16", "2026-12-25"
+];
+
+function isHoliday(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    return HOLIDAYS.includes(dateStr);
+}
+
+
 const CONFIG = {
     colModelIndex: 2, // Column C (0-indexed)
     colWorkOrderIndex: 3, // Column D (0-indexed)
@@ -503,13 +519,64 @@ async function checkWeeklyReset() {
     const APP_VERSION = "5.0";
 
     if (!window.dashboard_storage) {
-        window.dashboard_storage = { version: APP_VERSION, data: {}, history: [] };
+        window.dashboard_storage = { 
+            version: APP_VERSION, 
+            weekId: currentWeekId, 
+            data: {}, 
+            history: [],
+            prevFridayData: {}
+        };
     }
 
     let stored = window.dashboard_storage;
 
-    // ENSURE ALL CATEGORIES EXIST
+    // 1. LOGICA DE REINICIO SEMANAL
+    // Si la semana guardada es diferente a la actual, se archiva y se limpia.
+    if (stored.weekId && stored.weekId !== currentWeekId) {
+        console.log(`Cambio de semana detectado: ${stored.weekId} -> ${currentWeekId}`);
+        updateStatus(`Nueva semana: Archivando ${stored.weekId}...`, 'info');
+
+        // Crear respaldo en historial
+        const snapshot = JSON.parse(JSON.stringify(stored));
+        delete snapshot.history; 
+        stored.history = stored.history || [];
+        stored.history.unshift(snapshot);
+        if (stored.history.length > 20) stored.history.pop(); // Guardar hasta 20 semanas
+
+        // ACCION: Mover datos del Viernes a VIE ANT (Previous Friday)
+        stored.prevFridayData = stored.prevFridayData || {};
+        CATEGORIES.forEach(cat => {
+            const lastFridayCount = (stored.data[cat] && stored.data[cat]["VIERNES"]) || 0;
+            const lastThursdayCount = (stored.data[cat] && stored.data[cat]["JUEVES"]) || 0;
+            
+            // Determinar tendencia del viernes antes de limpiar
+            let trend = "trend-equal";
+            if (lastFridayCount < lastThursdayCount) trend = "trend-down";
+            else if (lastFridayCount > lastThursdayCount) trend = "trend-up";
+
+            // Guardamos para la comparación de la nueva semana
+            stored.prevFridayData[cat] = {
+                count: lastFridayCount,
+                trend: trend
+            };
+
+            // Reiniciar casillas para la nueva semana
+            stored.data[cat] = {};
+            WEEK_DAYS.forEach(day => stored.data[cat][day] = 0);
+        });
+
+        stored.weekId = currentWeekId;
+        await saveStateToServer();
+        console.log("Dashboard reiniciado para la nueva semana.");
+    } else if (!stored.weekId) {
+        stored.weekId = currentWeekId;
+    }
+
+    // 2. ASEGURAR INTEGRIDAD DE DATOS (Categorías faltantes)
     let added = false;
+    stored.data = stored.data || {};
+    stored.prevFridayData = stored.prevFridayData || {};
+
     CATEGORIES.forEach(cat => {
         if (!stored.data[cat]) {
             stored.data[cat] = {};
@@ -525,12 +592,12 @@ async function checkWeeklyReset() {
     if (added || stored.version !== APP_VERSION) {
         stored.version = APP_VERSION;
         await saveStateToServer();
-        console.log("Dashboard categories/version updated.");
     }
 
     const weekPill = document.getElementById('currentWeekPill');
     if (weekPill) weekPill.textContent = currentWeekId;
 }
+
 
 function handleFileUpload(e) {
     const file = e.target.files[0];
@@ -849,18 +916,34 @@ function updateAccumulatedData() {
     const stored = window.dashboard_storage;
     if (!stored) return;
 
-    // Get current day: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    let dayNum = new Date().getDay();
+    const now = new Date();
+    let dayNum = now.getDay(); // 0 = Sunday, 1 = Monday...
+    let checkDate = new Date(now);
 
-    // If it's Sunday, treat it as Monday (1)
-    if (dayNum === 0) dayNum = 1;
+    // LOGICA: Domingo y Lunes se sincronizan. 
+    // Si es domingo, operamos como si fuera Lunes y revisamos si el Lunes es festivo.
+    if (dayNum === 0) {
+        dayNum = 1;
+        checkDate.setDate(now.getDate() + 1);
+    }
 
-    const todayIndex = (dayNum + 6) % 7; // Monday = 0, Tuesday = 1, ...
-    if (todayIndex > 4) return; // Skip Saturday (which would be index 5)
+    let todayIndex = (dayNum + 6) % 7; // Monday = 0, Tuesday = 1, ...
+
+    // Si la fecha operativa (hoy o mañana si es domingo) es festivo, desplazamos
+    if (isHoliday(checkDate)) {
+        console.log("Día festivo detectado para la fecha operativa. Desplazando un día.");
+        todayIndex++;
+    }
+
+    if (todayIndex > 4) {
+        console.warn("Día fuera del rango de la tabla semanal (L-V).");
+        return; 
+    }
 
     const todayName = WEEK_DAYS[todayIndex];
 
     const currentCounts = {};
+
     CATEGORIES.forEach(cat => currentCounts[cat] = 0);
 
     filteredData.forEach(row => {
@@ -877,6 +960,7 @@ function updateAccumulatedData() {
 
     saveStateToServer();
 }
+
 
 function renderDashboard(entradasData, salidasData, firstData, seconsData) {
     renderSummaryTable();
