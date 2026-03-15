@@ -683,7 +683,7 @@ function handleFileUpload(e) {
             const altoAgingData = processAltoAging(statusRows, mrbRows);
             renderAltoAgingChart(altoAgingData);
 
-            renderDashboard(entradasData, salidasData, firstData, seconsData);
+            renderDashboard(entradasData, salidasData, firstData);
             if (golesData.length > 0) {
                 renderGolesTable(golesData);
             }
@@ -954,8 +954,8 @@ async function updateAccumulatedData() {
     CATEGORIES.forEach(cat => currentCounts[cat] = 0);
 
     filteredData.forEach(row => {
-        const rawCode = String(row[CONFIG.colErrorCodeIndex] || '').trim();
-        const cat = getCategory(rawCode);
+        const modelRaw = String(row[CONFIG.colModelIndex] || '').trim();
+        const cat = getCategory(modelRaw);
         if (CATEGORIES.includes(cat)) {
             currentCounts[cat]++;
         }
@@ -1506,15 +1506,11 @@ function renderSummaryTable() {
         const prevFridayRaw = (stored.prevFridayData && stored.prevFridayData[cat]) || 0;
         let prevVal = (typeof prevFridayRaw === 'object') ? (prevFridayRaw.count || 0) : prevFridayRaw;
 
-        let hasData = prevVal > 0;
-        WEEK_DAYS.forEach(d => { if ((stored.data[cat][d] || 0) > 0) hasData = true; });
-        if (!hasData) return null;
-
         grandPrevTotal += prevVal;
         WEEK_DAYS.forEach(d => totalsByDay[d] += (stored.data[cat][d] || 0));
 
         return { cat, prevRaw: prevFridayRaw, prevVal };
-    }).filter(r => r !== null);
+    }); // Removed .filter(r => r !== null) to show all categories
 
     let html = "";
 
