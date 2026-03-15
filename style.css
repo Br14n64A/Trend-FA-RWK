@@ -779,7 +779,12 @@ tr:hover td {
     }
 
     .first-content-layout {
+        display: block;
         padding: 0.5rem;
+    }
+
+    .first-table-container {
+        display: none;
     }
 
     .chart-container-compact {
