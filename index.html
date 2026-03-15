@@ -8,18 +8,25 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     
-    <!-- Local Libraries (Loaded locally to avoid tracking prevention issues) -->
-    <script src="libs/chart.js"></script>
-    <script src="libs/xlsx.full.min.js"></script>
-    <script src="libs/exceljs.min.js"></script>
-    <script src="libs/pptxgen.bundle.js"></script>
+    <!-- Library Loading with Fallback -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="this.src='libs/chart.js'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" onerror="this.src='libs/xlsx.full.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js" onerror="this.src='libs/exceljs.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js" onerror="this.src='libs/pptxgen.bundle.js'"></script>
     
     <script>
         window.addEventListener('load', () => {
-            if (typeof Chart === 'undefined') console.error('FAILED TO LOAD: Chart.js');
-            if (typeof XLSX === 'undefined') console.error('FAILED TO LOAD: SheetJS (XLSX)');
-            if (typeof ExcelJS === 'undefined') console.error('FAILED TO LOAD: ExcelJS');
-            if (typeof PptxGenJS === 'undefined') console.error('FAILED TO LOAD: PptxGenJS');
+            const status = {
+                Chart: typeof Chart !== 'undefined',
+                XLSX: typeof XLSX !== 'undefined',
+                ExcelJS: typeof ExcelJS !== 'undefined',
+                PptxGenJS: typeof PptxGenJS !== 'undefined'
+            };
+            console.log('Library Load Status:', status);
+            
+            if (!status.Chart || !status.XLSX) {
+                alert('Error crítico: No se pudieron cargar las librerías necesarias. Verifique su conexión a internet o asegúrese de que la carpeta "libs" esté presente en el servidor.');
+            }
         });
     </script>
 </head>
