@@ -508,7 +508,7 @@ function getWeekId(date = new Date()) {
     // Domingo (0) se trata como el final de la semana anterior
     const day = d.getDay();
     if (day === 0) {
-        d.setDate(d.getDate() - 1); // Forzar a Sábado para que use la misma semana
+        d.setDate(d.getDate() + 1); // Domingo se trata como el inicio de la nueva semana (Lunes)
     }
     
     const startOfYear = new Date(d.getFullYear(), 0, 1);
@@ -612,10 +612,13 @@ function handleFileUpload(e) {
     updateStatus(`Reading ${file.name}...`);
 
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
+
+            // Verificar si hay cambio de semana antes de procesar los nuevos datos
+            await checkWeeklyReset();
 
             // 1. Sheet 1 / Hoja 1 (PCBA_Status_AWS_OPEN_N-SHIPPING)
             const h1Name = workbook.SheetNames.find(n => n.toUpperCase().includes("HOJA 1")) || 
@@ -1050,7 +1053,7 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
                 ctx.font = 'bold 12px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#f8fafc';
+                ctx.fillStyle = '#000000';
 
                 chart.data.datasets.forEach((dataset, i) => {
                     const meta = chart.getDatasetMeta(i);
@@ -1164,7 +1167,7 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
                 ctx.font = 'bold 11px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#f8fafc';
+                ctx.fillStyle = '#000000';
 
                 sortedComponents.forEach((comp, index) => {
                     const total = Object.values(componentModelCounts[comp]).reduce((s, v) => s + v, 0);
@@ -1476,7 +1479,7 @@ function renderAltoAgingChart(data) {
                     ctx.roundRect(rx, ry, rw, rh, 4);
                     ctx.fill();
 
-                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillStyle = '#000000';
                     ctx.fillText(label, posX, topY - padY);
                 });
                 ctx.restore();
@@ -1593,7 +1596,7 @@ function renderSecondsChart(data) {
                 ctx.font = 'bold 12px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#f8fafc';
+                ctx.fillStyle = '#000000';
 
                 chart.data.datasets.forEach((dataset, i) => {
                     const meta = chart.getDatasetMeta(i);
