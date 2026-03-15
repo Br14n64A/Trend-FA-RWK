@@ -261,8 +261,7 @@ let charts = {
     entradas: null,
     salidas: null,
     first: null,
-    altoAging: null,
-    secons: null
+    altoAging: null
 };
 
 // Storage Structure: 
@@ -391,7 +390,6 @@ async function loadStateFromServer() {
     } catch (e) {
         console.error("Error loading local data:", e);
         await checkWeeklyReset();
-        await resolveLostData();
         updateStatus('Error de memoria', 'error');
     }
 }
@@ -497,9 +495,7 @@ function restoreState() {
         renderGolesTable(stored.golesData);
     }
 
-    if (stored.seconsData && Object.keys(stored.seconsData).length > 0) {
-        renderSecondsChart(stored.seconsData);
-    }
+
 }
 
 function getWeekId(date = new Date()) {
@@ -660,15 +656,6 @@ function handleFileUpload(e) {
                 firstData = processFirst(rows);
             }
 
-            // 5. SECONS (Hoja 2)
-            const h2Name = workbook.SheetNames.find(n => n.toUpperCase().includes("HOJA 2")) || workbook.SheetNames[1];
-            const sheet2 = workbook.Sheets[h2Name];
-            let seconsData = {};
-            if (sheet2 && statusRows.length > 1) {
-                const sheet2Rows = XLSX.utils.sheet_to_json(sheet2, { header: 1 });
-                seconsData = processSeconds(statusRows, sheet2Rows);
-            }
-
             // 6. GOLES (Search by name "GOLES" or index 4)
             let golesSheetName = workbook.SheetNames.find(n => n.trim().toUpperCase() === "GOLES");
 
@@ -708,7 +695,6 @@ function handleFileUpload(e) {
             stored.firstData = firstData;
             stored.golesData = golesData;
             stored.altoAgingData = altoAgingData;
-            stored.seconsData = seconsData;
             saveStateToServer();
 
             updateStatus('File processed successfully', 'success');
@@ -983,18 +969,14 @@ async function updateAccumulatedData() {
 }
 
 
-function renderDashboard(entradasData, salidasData, firstData, seconsData) {
+function renderDashboard(entradasData, salidasData, firstData) {
     renderSummaryTable();
     // Entradas: Model Serial is Column D (index 3)
     if (entradasData) renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal");
     // Salidas: Model Serial is Column C (index 2)
     if (salidasData) renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal");
     
-    // Pass seconsDetails to firstChart for tooltips if available
-    const seconsDetails = seconsData ? seconsData.details : null;
-    if (firstData) renderFirstChart("firstChart", firstData, seconsDetails);
-    
-    if (seconsData) renderSecondsChart(seconsData);
+    if (firstData) renderFirstChart("firstChart", firstData);
 }
 
 function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, totalElementId) {
@@ -1036,11 +1018,12 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
             responsive: true,
             maintainAspectRatio: false,
             layout: {
-                padding: { top: 20 }
+                padding: { top: 40 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
+                    grace: '25%',
                     grid: { color: 'rgba(0,0,0,0.1)' },
                     ticks: { color: '#475569' }
                 },
@@ -1081,17 +1064,19 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
     });
 }
 
-function renderFirstChart(canvasId, data, seconsDetails = null) {
-    // Column J (index 9) is Component, Column C (index 2) is Model
+function renderFirstChart(canvasId, data) {
+    // Column J (index 9) is Component, Column C (index 2) is Model, Column H (index 7) is Details
     const componentModelCounts = {};
     const components = new Set();
     const models = new Set();
+    const componentHDetails = {}; 
     let grandTotal = 0;
 
     data.forEach(row => {
         const component = String(row[9] || 'Unknown').trim();
         const rawModel = String(row[2] || 'Unknown').trim();
         const model = getCategory(rawModel);
+        const colH = String(row[7] || 'N/A').trim();
 
         if (model !== "OTHER") {
             components.add(component);
@@ -1099,6 +1084,13 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
 
             if (!componentModelCounts[component]) componentModelCounts[component] = {};
             componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
+
+            // Track Column H details per component and model (exclude N/A or empty)
+            if (colH && colH.toUpperCase() !== 'N/A') {
+                if (!componentHDetails[component]) componentHDetails[component] = {};
+                if (!componentHDetails[component][model]) componentHDetails[component][model] = {};
+                componentHDetails[component][model][colH] = (componentHDetails[component][model][colH] || 0) + 1;
+            }
 
             grandTotal++;
         }
@@ -1140,11 +1132,11 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
             responsive: true,
             maintainAspectRatio: false,
             layout: {
-                padding: { top: 20 }
+                padding: { top: 40 }
             },
             scales: {
                 x: { stacked: true, grid: { display: false }, ticks: { color: '#475569' } },
-                y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { color: '#475569', precision: 0 } }
+                y: { stacked: true, beginAtZero: true, grace: '25%', grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { color: '#475569', precision: 0 } }
             },
             plugins: {
                 legend: {
@@ -1154,19 +1146,18 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
                 tooltip: {
                     callbacks: {
                         afterBody: (context) => {
-                            const ctxItem = context[0];
-                            const modelCategory = ctxItem.dataset.label;
+                            const component = context[0].label;
+                            const model = context[0].dataset.label;
+                            const hEntries = (componentHDetails[component] || {})[model] || {};
                             
-                            // Show Hoja 2 Col M info for this model category
-                            if (seconsDetails && seconsDetails[modelCategory]) {
-                                const details = seconsDetails[modelCategory];
-                                const lines = [`Info ${modelCategory} (Hoja 2 Col M):`];
-                                Object.entries(details).forEach(([val, count]) => {
+                            const lines = [];
+                            if (Object.keys(hEntries).length > 0) {
+                                lines.push("Fallas:");
+                                Object.entries(hEntries).forEach(([val, count]) => {
                                     lines.push(` • ${val}: ${count}`);
                                 });
-                                return lines;
                             }
-                            return "";
+                            return lines;
                         }
                     }
                 }
@@ -1415,7 +1406,7 @@ function renderAltoAgingChart(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: { padding: { top: 28 } },
+            layout: { padding: { top: 40 } },
             scales: {
                 x: {
                     stacked: true,
@@ -1431,6 +1422,7 @@ function renderAltoAgingChart(data) {
                 y: {
                     stacked: true,
                     beginAtZero: true,
+                    grace: '25%',
                     grid: { color: 'rgba(255,255,255,0.08)' },
                     ticks: { color: '#94a3b8', precision: 0, font: { family: 'Outfit' } }
                 }
@@ -1488,129 +1480,7 @@ function renderAltoAgingChart(data) {
     });
 }
 
-function processSeconds(sheet1Rows, sheet2Rows) {
-    if (!sheet2Rows || sheet2Rows.length < 2) return { counts: {}, details: {} };
 
-    const sheet2Data = sheet2Rows.slice(1);
-    const modelData = {};
-    const modelDetails = {}; 
-    
-    sheet2Data.forEach(row => {
-        // Col Q (index 16) == 0 AND Col R (index 17) > 0
-        const rawQ = String(row[16] || '').trim();
-        const colQ = parseFloat(rawQ);
-        const rawR = String(row[17] || '0').trim();
-        const colR = parseFloat(rawR);
-
-        if ((rawQ === "0" || colQ === 0) && colR > 0) {
-            const rawModel = String(row[3] || 'Unknown').trim(); // Col D
-            const category = getCategory(rawModel);
-            if (category === "OTHER") return;
-            
-            // Value from Column M (index 12)
-            let valM = parseFloat(row[12]);
-            const isNumericM = !isNaN(valM);
-            const valToAdd = isNumericM ? valM : 1;
-            
-            modelData[category] = (modelData[category] || 0) + valToAdd;
-            
-            // Details for Tooltips: Show serial (Col A) and the value from M
-            const serial = String(row[0] || 'N/A').trim();
-            const detailLabel = isNumericM ? `Serial: ${serial}` : String(row[12] || 'N/A').trim();
-            
-            if (!modelDetails[category]) modelDetails[category] = {};
-            modelDetails[category][detailLabel] = (modelDetails[category][detailLabel] || 0) + valToAdd;
-        }
-    });
-
-    return { counts: modelData, details: modelDetails };
-}
-
-function renderSecondsChart(data) {
-    const canvas = document.getElementById('seconsChart');
-    if (!canvas) return;
-
-    // Handle both old format and new format with details
-    const counts = data.counts || data;
-    const details = data.details || {};
-
-    const labels = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    const values = labels.map(l => counts[l]);
-    const grandTotal = values.reduce((s, v) => s + v, 0);
-
-    const totalEl = document.getElementById('seconsTotal');
-    if (totalEl) totalEl.textContent = `Total: ${grandTotal.toFixed(0)}`;
-
-    const ctx = canvas.getContext('2d');
-    if (charts.secons) charts.secons.destroy();
-
-    charts.secons = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'SECONDS Value',
-                data: values,
-                backgroundColor: '#f472b6',
-                borderRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: 'rgba(0,0,0,0.1)' },
-                    ticks: { color: '#475569' }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#475569' }
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        afterBody: (context) => {
-                            const category = context[0].label;
-                            const catDetails = details[category];
-                            if (catDetails) {
-                                const lines = ["Info (Col M):"];
-                                Object.entries(catDetails).forEach(([val, count]) => {
-                                    lines.push(` • ${val}: ${count}`);
-                                });
-                                return lines;
-                            }
-                            return "";
-                        }
-                    }
-                }
-            }
-        },
-        plugins: [{
-            id: 'seconsLabelsPlugin',
-            afterDraw: (chart) => {
-                const ctx = chart.ctx;
-                ctx.font = 'bold 13px Outfit';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#000000';
-
-                chart.data.datasets.forEach((dataset, i) => {
-                    const meta = chart.getDatasetMeta(i);
-                    meta.data.forEach((bar, index) => {
-                        const dataVal = dataset.data[index];
-                        if (dataVal > 0 && !meta.hidden) {
-                            ctx.fillText(dataVal.toFixed(0), bar.x, bar.y - 10);
-                        }
-                    });
-                });
-            }
-        }]
-    });
-}
 
 
 function renderSummaryTable() {
@@ -1668,7 +1538,15 @@ function renderSummaryTable() {
                 rowHtml += `<td data-label="${d}"><input type="number" class="edit-input" value="${count}" onchange="updateManualSummary('${cat}', '${d}', this.value)"></td>`;
             } else {
                 let trendClass = getTrendClass(count, lastVal);
-                lastVal = count;
+                
+                // Holiday Logic: If current day is 0 (festivo), 
+                // the NEXT day will compare against VIE ANT (prevVal) instead of 0.
+                if (count === 0) {
+                    lastVal = prevVal; 
+                } else {
+                    lastVal = count;
+                }
+                
                 rowHtml += `<td class="${trendClass}" data-label="${d}">${count}</td>`;
             }
         });
