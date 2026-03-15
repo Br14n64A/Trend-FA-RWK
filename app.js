@@ -328,7 +328,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-window.updateManualSummary = (cat, day, value) => {
+window.updateManualSummary = async (cat, day, value) => {
     const val = parseInt(value, 10) || 0;
     const stored = window.dashboard_storage;
     if (day === 'PREV') {
@@ -1041,12 +1041,12 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: 'rgba(255,255,255,0.1)' },
-                    ticks: { color: '#94a3b8' }
+                    grid: { color: 'rgba(0,0,0,0.1)' },
+                    ticks: { color: '#475569' }
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { color: '#94a3b8' }
+                    ticks: { color: '#475569' }
                 }
             },
             plugins: {
@@ -1065,7 +1065,7 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
                 ctx.font = 'bold 13px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = '#000000';
 
                 chart.data.datasets.forEach((dataset, i) => {
                     const meta = chart.getDatasetMeta(i);
@@ -1143,13 +1143,13 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
                 padding: { top: 20 }
             },
             scales: {
-                x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } },
-                y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#94a3b8', precision: 0 } }
+                x: { stacked: true, grid: { display: false }, ticks: { color: '#475569' } },
+                y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { color: '#475569', precision: 0 } }
             },
             plugins: {
                 legend: {
                     position: 'top',
-                    labels: { color: '#94a3b8', font: { size: 10, family: 'Outfit' } }
+                    labels: { color: '#475569', font: { size: 10, family: 'Outfit' } }
                 },
                 tooltip: {
                     callbacks: {
@@ -1179,7 +1179,7 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
                 ctx.font = 'bold 13px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = '#000000';
 
                 sortedComponents.forEach((comp, index) => {
                     const total = Object.values(componentModelCounts[comp]).reduce((s, v) => s + v, 0);
@@ -1477,9 +1477,9 @@ function renderAltoAgingChart(data) {
                         }
                     }
 
-                    // Draw labels in solid white
+                    // Draw labels in solid black
                     const label = String(total);
-                    ctx.fillStyle = '#ffffff';
+                    ctx.fillStyle = '#000000';
                     ctx.fillText(label, posX, topY - 10);
                 });
                 ctx.restore();
@@ -1561,12 +1561,12 @@ function renderSecondsChart(data) {
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: 'rgba(255,255,255,0.1)' },
-                    ticks: { color: '#94a3b8' }
+                    grid: { color: 'rgba(0,0,0,0.1)' },
+                    ticks: { color: '#475569' }
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { color: '#94a3b8' }
+                    ticks: { color: '#475569' }
                 }
             },
             plugins: {
@@ -1596,7 +1596,7 @@ function renderSecondsChart(data) {
                 ctx.font = 'bold 13px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = '#000000';
 
                 chart.data.datasets.forEach((dataset, i) => {
                     const meta = chart.getDatasetMeta(i);
