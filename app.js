@@ -342,7 +342,9 @@ window.updateManualSummary = (cat, day, value) => {
         if (!stored.data[cat]) stored.data[cat] = {};
         stored.data[cat][day] = val;
     }
-    saveStateToServer();
+    // Guardar cambios
+    await saveStateToServer();
+    console.log("Datos acumulados actualizados y guardados.");
     // No full re-render here to avoid losing focus if using individual inputs, 
     // but we need it to update totals. Maybe just re-render totals or use a timer.
     // For now, full re-render is okay as onchange usually happens on blur.
@@ -631,7 +633,7 @@ function handleFileUpload(e) {
                 headers = statusRows[0];
                 rawData = statusRows.slice(1);
                 processData();
-                updateAccumulatedData();
+                await updateAccumulatedData(); // Made async and awaited
             }
 
             // 2. Entradas
@@ -921,35 +923,45 @@ function processData() {
     }
 }
 
-function updateAccumulatedData() {
+async function updateAccumulatedData() {
     const stored = window.dashboard_storage;
     if (!stored) return;
 
     const now = new Date();
-    let dayNum = now.getDay(); // 0 = Sunday, 1 = Monday...
-    let checkDate = new Date(now);
+    let currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    let effectiveDate = new Date(now);
 
-    // LOGICA: Domingo y Lunes se sincronizan. 
-    // Si es domingo, operamos como si fuera Lunes y revisamos si el Lunes es festivo.
-    if (dayNum === 0) {
-        dayNum = 1;
-        checkDate.setDate(now.getDate() + 1);
+    // Determine the effective day for data accumulation (Monday-Friday)
+    // If it's Saturday (6) or Sunday (0), data should be accumulated for the next Monday.
+    // If it's a weekday, it's for that day.
+    let targetDayIndex; // 0 for LUNES, 1 for MARTES, etc.
+
+    if (currentDayOfWeek === 0) { // Sunday
+        effectiveDate.setDate(effectiveDate.getDate() + 1); // Move to Monday
+        targetDayIndex = 0; // LUNES
+    } else if (currentDayOfWeek === 6) { // Saturday
+        effectiveDate.setDate(effectiveDate.getDate() + 2); // Move to Monday
+        targetDayIndex = 0; // LUNES
+    } else { // Monday (1) to Friday (5)
+        targetDayIndex = currentDayOfWeek - 1; // Map 1->0, 2->1, ..., 5->4
     }
 
-    let todayIndex = (dayNum + 6) % 7; // Monday = 0, Tuesday = 1, ...
-
-    // Si la fecha operativa (hoy o mañana si es domingo) es festivo, desplazamos
-    if (isHoliday(checkDate)) {
-        console.log("Día festivo detectado para la fecha operativa. Desplazando un día.");
-        todayIndex++;
+    // Adjust for holidays: if the effectiveDate is a holiday, move to the next working day
+    while (isHoliday(effectiveDate) || effectiveDate.getDay() === 0 || effectiveDate.getDay() === 6) {
+        effectiveDate.setDate(effectiveDate.getDate() + 1);
+        // Recalculate targetDayIndex based on the new effectiveDate's day of week
+        const newDayOfWeek = effectiveDate.getDay();
+        if (newDayOfWeek >= 1 && newDayOfWeek <= 5) { // If it's a weekday
+            targetDayIndex = newDayOfWeek - 1;
+        }
     }
 
-    if (todayIndex > 4) {
-        console.warn("Día fuera del rango de la tabla semanal (L-V).");
+    if (targetDayIndex < 0 || targetDayIndex >= WEEK_DAYS.length) {
+        console.warn("Día fuera del rango de la tabla semanal (L-V) después de ajustes por fin de semana/festivos.");
         return; 
     }
 
-    const todayName = WEEK_DAYS[todayIndex];
+    const todayName = WEEK_DAYS[targetDayIndex];
 
     const currentCounts = {};
 
@@ -967,7 +979,7 @@ function updateAccumulatedData() {
         stored.data[cat][todayName] = currentCounts[cat];
     });
 
-    saveStateToServer();
+    await saveStateToServer();
 }
 
 
@@ -1030,11 +1042,11 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
                 y: {
                     beginAtZero: true,
                     grid: { color: 'rgba(255,255,255,0.1)' },
-                    ticks: { color: '#94a3b8' }
+                    ticks: { color: '#000000' }
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { color: '#94a3b8' }
+                    ticks: { color: '#000000' }
                 }
             },
             plugins: {
@@ -1131,13 +1143,13 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
                 padding: { top: 20 }
             },
             scales: {
-                x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } },
-                y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#94a3b8', precision: 0 } }
+                x: { stacked: true, grid: { display: false }, ticks: { color: '#000000' } },
+                y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { color: '#000000', precision: 0 } }
             },
             plugins: {
                 legend: {
                     position: 'top',
-                    labels: { color: '#94a3b8', font: { size: 10, family: 'Outfit' } }
+                    labels: { color: '#000000', font: { size: 10, family: 'Outfit' } }
                 },
                 tooltip: {
                     callbacks: {
@@ -1465,22 +1477,10 @@ function renderAltoAgingChart(data) {
                         }
                     }
 
-                    // Draw a subtle pill background behind the number
+                    // Draw labels in solid black without background
                     const label = String(total);
-                    const textW = ctx.measureText(label).width;
-                    const padX = 6, padY = 4;
-                    const rx = posX - textW / 2 - padX;
-                    const ry = topY - 22;
-                    const rw = textW + padX * 2;
-                    const rh = 18;
-
-                    ctx.fillStyle = 'rgba(15,23,42,0.75)';
-                    ctx.beginPath();
-                    ctx.roundRect(rx, ry, rw, rh, 4);
-                    ctx.fill();
-
                     ctx.fillStyle = '#000000';
-                    ctx.fillText(label, posX, topY - padY);
+                    ctx.fillText(label, posX, topY - 10);
                 });
                 ctx.restore();
             }
@@ -1562,11 +1562,11 @@ function renderSecondsChart(data) {
                 y: {
                     beginAtZero: true,
                     grid: { color: 'rgba(255,255,255,0.1)' },
-                    ticks: { color: '#94a3b8' }
+                    ticks: { color: '#000000' }
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { color: '#94a3b8' }
+                    ticks: { color: '#000000' }
                 }
             },
             plugins: {
