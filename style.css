@@ -1,11 +1,11 @@
 :root {
-    --bg-dark: #ffffff;
-    --card-bg: rgba(248, 250, 252, 0.8);
+    --bg-dark: #0f172a;
+    --card-bg: rgba(30, 41, 59, 0.7);
     --accent-primary: #e11d48;
     --accent-secondary: #f97316;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --glass-border: rgba(0, 0, 0, 0.08);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --glass-border: rgba(255, 255, 255, 0.12);
     --success: #10b981;
     --danger: #ef4444;
 }
@@ -36,21 +36,19 @@ body {
 .blur-1 {
     width: 600px;
     height: 600px;
-    background: #ffedd5;
-    /* Soft orange */
+    background: #312e81; /* Deep Indigo */
     top: -200px;
     right: -150px;
-    opacity: 0.6;
+    opacity: 0.3;
 }
 
 .blur-2 {
     width: 500px;
     height: 500px;
-    background: #ffe4e6;
-    /* Soft Rose */
+    background: #4c1d95; /* Deep Purple */
     bottom: -150px;
     left: -150px;
-    opacity: 0.5;
+    opacity: 0.2;
 }
 
 .app-container {
@@ -275,7 +273,7 @@ header {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid var(--glass-border);
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .card-header h2 {
@@ -364,55 +362,55 @@ tr:hover td {
 }
 
 .summary-table th {
-    background: #cbd5e1;
-    color: #000000;
+    background: #020617; /* Darker navy for headers */
+    color: #f8fafc;
     padding: 0.75rem;
     font-weight: 700;
     text-align: center;
-    border: none;
+    border: 1px solid var(--glass-border);
 }
 
 .summary-table th.day-header {
-    background: #fef08a;
-    /* Default yellow for days */
+    background: #334155;
 }
 
 .summary-table td {
     padding: 0.75rem;
     text-align: center;
     font-weight: 600;
-    border: none;
-    color: #1e293b;
+    border: 1px solid var(--glass-border);
+    color: #f1f5f9;
+    background: #0f172a; /* Consistent dark background for cells */
 }
 
 .summary-table .model-col {
-    background: #e2e8f0;
+    background: #111827; /* Distinct column background */
     text-align: left;
     padding-left: 1rem;
 }
 
 .summary-table .total-row td {
-    background: #cbd5e1 !important;
+    background: #334155 !important; /* Steel gray for totals */
     font-weight: 800;
-    border-top: 2px solid #94a3b8;
+    border-top: 2px solid #475569;
 }
 
 /* Trend helpers - Colors based on user request */
 .trend-down {
-    background-color: #55a64d !important;
-    color: #000000 !important;
+    background-color: #065f46 !important; /* Darker Green */
+    color: #ffffff !important;
 }
 
 /* Green (Improved/Lower) */
 .trend-equal {
-    background-color: #fef08a !important;
-    color: #1e293b !important;
+    background-color: #854d0e !important; /* Darker Yellow/Ocre */
+    color: #ffffff !important;
 }
 
 /* Yellow (Same) */
 .trend-up {
-    background-color: #f7a379 !important;
-    color: #000000 !important;
+    background-color: #991b1b !important; /* Darker Red */
+    color: #ffffff !important;
 }
 
 /* Red/Salmon (Higher) */
@@ -498,8 +496,8 @@ tr:hover td {
     padding: 0.6rem 1rem;
     font-size: 0.9rem;
     font-weight: 600;
-    color: #1e293b;
-    background: #f1f5f9;
+    color: #f8fafc;
+    background: #0f172a;
     text-align: center;
 }
 
@@ -508,8 +506,8 @@ tr:hover td {
 }
 
 .goles-table .val-col {
-    background: #f8fafc;
-    border-right: 1px solid rgba(148, 163, 184, 0.2);
+    background: #0f172a;
+    border-right: 1px solid var(--glass-border);
 }
 
 .goles-table .pct-col {
@@ -518,9 +516,9 @@ tr:hover td {
 }
 
 .goles-table tfoot td {
-    background: #94a3b8 !important;
+    background: #334155 !important;
     font-weight: 800;
-    color: #1e293b;
+    color: #f8fafc;
 }
 
 .goles-table tr:hover td {
@@ -589,7 +587,7 @@ tr:hover td {
 
 
 .first-table-container {
-    background: #ffffff;
+    background: #0f172a;
     border-radius: 12px;
     padding: 0.5rem;
     border: 1px solid var(--glass-border);
@@ -605,8 +603,8 @@ tr:hover td {
 
 .compact-table th {
     padding: 0.6rem;
-    background: #cbd5e1;
-    color: #1e293b;
+    background: #334155;
+    color: #f8fafc;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -616,8 +614,9 @@ tr:hover td {
 
 .compact-table td {
     padding: 0.5rem 0.6rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    color: #1e293b;
+    border-bottom: 1px solid var(--glass-border);
+    color: #f8fafc;
+    background: #0f172a;
 }
 
 .compact-table tr:hover td {
