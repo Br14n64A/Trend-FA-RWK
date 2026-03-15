@@ -1062,7 +1062,7 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
             id: 'topLabelsPlugin',
             afterDraw: (chart) => {
                 const ctx = chart.ctx;
-                ctx.font = 'bold 12px Outfit';
+                ctx.font = 'bold 13px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
                 ctx.fillStyle = '#000000';
@@ -1072,7 +1072,7 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
                     meta.data.forEach((bar, index) => {
                         const data = dataset.data[index];
                         if (data > 0 && !meta.hidden) {
-                            ctx.fillText(data, bar.x, bar.y - 5);
+                            ctx.fillText(data, bar.x, bar.y - 10);
                         }
                     });
                 });
@@ -1176,7 +1176,7 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
             id: 'stackedTopLabelsPlugin',
             afterDraw: (chart) => {
                 const ctx = chart.ctx;
-                ctx.font = 'bold 11px Outfit';
+                ctx.font = 'bold 13px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
                 ctx.fillStyle = '#000000';
@@ -1202,7 +1202,7 @@ function renderFirstChart(canvasId, data, seconsDetails = null) {
                     }
 
                     if (total > 0 && found) {
-                        ctx.fillText(total, posX, highestY - 5);
+                        ctx.fillText(total, posX, highestY - 10);
                     }
                 });
             }
@@ -1593,7 +1593,7 @@ function renderSecondsChart(data) {
             id: 'seconsLabelsPlugin',
             afterDraw: (chart) => {
                 const ctx = chart.ctx;
-                ctx.font = 'bold 12px Outfit';
+                ctx.font = 'bold 13px Outfit';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
                 ctx.fillStyle = '#000000';
@@ -1603,7 +1603,7 @@ function renderSecondsChart(data) {
                     meta.data.forEach((bar, index) => {
                         const dataVal = dataset.data[index];
                         if (dataVal > 0 && !meta.hidden) {
-                            ctx.fillText(dataVal.toFixed(0), bar.x, bar.y - 5);
+                            ctx.fillText(dataVal.toFixed(0), bar.x, bar.y - 10);
                         }
                     });
                 });
