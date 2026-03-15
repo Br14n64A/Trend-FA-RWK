@@ -502,17 +502,23 @@ function restoreState() {
 
 function getWeekId(date = new Date()) {
     const d = new Date(date.getTime());
-    // Adjust to end of day if it's borderline
     d.setHours(0, 0, 0, 0);
-    // Sunday is 0 in JS. We want Sunday to be the start of the week.
-    // Standard US week calculation:
+    
+    // Ajuste para que la semana comience el Lunes (estilo operativo)
+    // Domingo (0) se trata como el final de la semana anterior
+    const day = d.getDay();
+    if (day === 0) {
+        d.setDate(d.getDate() - 1); // Forzar a Sábado para que use la misma semana
+    }
+    
     const startOfYear = new Date(d.getFullYear(), 0, 1);
+    const startDayOffset = (startOfYear.getDay() + 6) % 7; // Lunes = 0
     const days = Math.floor((d - startOfYear) / (24 * 60 * 60 * 1000));
-    // Week number = ceil((days + startDayOffset) / 7)
-    // Offset accounts for the day of the week Jan 1st was.
-    const weekNo = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+    const weekNo = Math.ceil((days + startDayOffset + 1) / 7);
+    
     return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
+
 
 async function checkWeeklyReset() {
     const currentWeekId = getWeekId();
