@@ -299,7 +299,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnExportPPT = document.getElementById('btnExportPPT');
     if (btnExportPPT) btnExportPPT.addEventListener('click', exportToPPT);
 
-    // No export to excel button found in HTML, so we remove the listener to avoid errors
+    const btnDownloadAltoAging = document.getElementById('btnDownloadAltoAging');
+    if (btnDownloadAltoAging) {
+        btnDownloadAltoAging.addEventListener('click', () => {
+            const stored = window.dashboard_storage;
+            if (stored && stored.altoAgingDetails) {
+                exportAltoAgingDetailsToExcel(stored.altoAgingDetails, stored.altoAgingHeaders);
+            } else {
+                alert('No hay datos detallados de Alto Aging para descargar.');
+            }
+        });
+    }
 
     const btnToggleEdit = document.getElementById('btnToggleEdit');
     if (btnToggleEdit) {
@@ -680,8 +690,8 @@ function handleFileUpload(e) {
             }
 
             // 7. Alto-Aging (from Sheet 1, col M & U, with IFS on col H and XLOOKUP from MRB)
-            const altoAgingData = processAltoAging(statusRows, mrbRows);
-            renderAltoAgingChart(altoAgingData);
+            const aaResult = processAltoAging(statusRows, mrbRows);
+            renderAltoAgingChart(aaResult.summary);
 
             renderDashboard(entradasData, salidasData, firstData);
             if (golesData.length > 0) {
@@ -694,7 +704,9 @@ function handleFileUpload(e) {
             stored.salidasData = salidasData;
             stored.firstData = firstData;
             stored.golesData = golesData;
-            stored.altoAgingData = altoAgingData;
+            stored.altoAgingData = aaResult.summary;
+            stored.altoAgingDetails = aaResult.details;
+            stored.altoAgingHeaders = statusRows[0];
             saveStateToServer();
 
             updateStatus('File processed successfully', 'success');
@@ -1300,11 +1312,12 @@ function applyXlookup(colAValue, mrbRows) {
  * @param {Array[]} mrbRows - All rows from MRB sheet (may be empty array)
  */
 function processAltoAging(rows, mrbRows = []) {
-    const result = {};
-    if (!rows || rows.length < 2) return result;
+    const summary = {};
+    const details = [];
+    if (!rows || rows.length < 2) return { summary, details };
 
     // Initialise all buckets so order is guaranteed
-    AGING_CATEGORIES.forEach(cat => result[cat] = {});
+    AGING_CATEGORIES.forEach(cat => summary[cat] = {});
 
     // Skip header row (index 0)
     for (let i = 1; i < rows.length; i++) {
@@ -1319,21 +1332,16 @@ function processAltoAging(rows, mrbRows = []) {
         if (colV) continue;
 
         // ── Aging bucket resolution ──
-        // Priority: col U (index 20) if it has a recognised value;
-        // otherwise fall back to IFS formula on col H (index 7).
         let rawAging = String(row[20] || '').trim().toUpperCase();
         let bucket = AGING_CATEGORIES.find(cat => rawAging === cat || rawAging.startsWith(cat));
 
         if (!bucket) {
-            // Apply IFS formula on col H (index 7)
             const colH = row[7];
             bucket = applyIfsFormula(colH);
-            // Make sure the IFS result is a recognised category
             if (!AGING_CATEGORIES.includes(bucket)) continue;
         }
 
         // ── Model resolution ──
-        // 1. Try XLOOKUP: search col A of this row in MRB col L → get MRB col A value
         const colA = String(row[0] || '').trim();
         let resolvedModel = '';
 
@@ -1341,23 +1349,22 @@ function processAltoAging(rows, mrbRows = []) {
             resolvedModel = applyXlookup(colA, mrbRows);
         }
 
-        // 2. If XLOOKUP didn't find a result, fall back to col M (index 12)
         const rawModel = resolvedModel || String(row[12] || '').trim();
         if (!rawModel) continue;
 
-        // 3. Map the model to a category (MB, NOGA, MOBO, etc.)
         const modelName = getCategory(rawModel);
         if (modelName === 'OTHER') continue;
 
-        result[bucket][modelName] = (result[bucket][modelName] || 0) + 1;
+        summary[bucket][modelName] = (summary[bucket][modelName] || 0) + 1;
+        details.push(row);
     }
 
     // Remove empty buckets
     AGING_CATEGORIES.forEach(cat => {
-        if (Object.keys(result[cat]).length === 0) delete result[cat];
+        if (Object.keys(summary[cat]).length === 0) delete summary[cat];
     });
 
-    return result;
+    return { summary, details };
 }
 
 /**
@@ -1478,6 +1485,121 @@ function renderAltoAgingChart(data) {
             }
         }]
     });
+
+    // Render the table below or next to the chart
+    renderAltoAgingTable(data, activeBuckets, sortedModels, bucketTotals);
+}
+
+/**
+ * Renders a compact table for Alto Aging data.
+ */
+function renderAltoAgingTable(data, activeBuckets, sortedModels, bucketTotals) {
+    const headerRow = document.getElementById('altoAgingHeader');
+    const body = document.getElementById('altoAgingBody');
+    if (!headerRow || !body) return;
+
+    // Build headers
+    headerRow.innerHTML = '<th>Aging Bucket</th>';
+    sortedModels.forEach(model => {
+        headerRow.innerHTML += `<th>${model}</th>`;
+    });
+    headerRow.innerHTML += '<th>Total</th>';
+
+    // Build rows
+    body.innerHTML = '';
+    activeBuckets.forEach(cat => {
+        let rowHtml = `<tr><td><strong>${cat}</strong></td>`;
+        sortedModels.forEach(model => {
+            const val = data[cat][model] || 0;
+            rowHtml += `<td>${val}</td>`;
+        });
+        rowHtml += `<td><strong>${bucketTotals[cat]}</strong></td></tr>`;
+        body.innerHTML += rowHtml;
+    });
+
+    // Subtotal row
+    let subtotalHtml = `<tr style="background: rgba(0,0,0,0.05)"><td><strong>TOTAL</strong></td>`;
+    let grandTotal = 0;
+    sortedModels.forEach(model => {
+        let modelTotal = 0;
+        activeBuckets.forEach(cat => {
+            modelTotal += (data[cat][model] || 0);
+        });
+        subtotalHtml += `<td><strong>${modelTotal}</strong></td>`;
+        grandTotal += modelTotal;
+    });
+    subtotalHtml += `<td><strong>${grandTotal}</strong></td></tr>`;
+    body.innerHTML += subtotalHtml;
+}
+
+/**
+ * Exports Alto Aging summary to Excel.
+ */
+/**
+ * Exports Alto Aging detail rows to Excel.
+ */
+async function exportAltoAgingDetailsToExcel(details, headers) {
+    if (typeof ExcelJS === 'undefined') {
+        alert('La librería ExcelJS no está cargada.');
+        return;
+    }
+
+    if (!details || details.length === 0) {
+        alert('No hay datos detallados para exportar.');
+        return;
+    }
+
+    try {
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Alto Aging Details');
+
+        // Styles
+        const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE11D48' } };
+        const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true };
+        const border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+        };
+
+        // Add headers (use provided headers or indices as fallback)
+        const headerValues = headers || details[0].map((_, i) => `Column ${i + 1}`);
+        const headerRow = sheet.addRow(headerValues);
+        headerRow.eachCell((cell) => {
+            cell.fill = headerFill;
+            cell.font = headerFont;
+            cell.border = border;
+            cell.alignment = { horizontal: 'center' };
+        });
+
+        // Add detail rows
+        details.forEach(row => {
+            const excelRow = sheet.addRow(row);
+            excelRow.eachCell((cell) => {
+                cell.border = border;
+            });
+        });
+
+        // Auto-size columns (rough estimate based on header length)
+        sheet.columns.forEach(column => {
+            column.width = 20;
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const weekStr = getWeekId();
+        a.download = `Alto_Aging_Details_${weekStr}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+    } catch (e) {
+        console.error('Error exporting Alto Aging details:', e);
+        alert('Error al exportar los detalles a Excel.');
+    }
 }
 
 

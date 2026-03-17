@@ -149,10 +149,25 @@
                                 <h2>Alto Aging por Modelo</h2>
                                 <div class="header-tags">
                                     <span class="pill" id="altoAgingTotal">Total: 0</span>
+                                    <button class="nav-btn btn-excel-compact" id="btnDownloadAltoAging" title="Descargar datos de Alto Aging">📥 Descargar</button>
                                 </div>
                             </div>
-                            <div class="chart-container" style="height: 380px;">
-                                <canvas id="altoAgingChart"></canvas>
+                            <div class="first-content-layout">
+                                <div class="chart-container-compact">
+                                    <canvas id="altoAgingChart"></canvas>
+                                </div>
+                                <div class="first-table-container">
+                                    <table class="compact-table" id="altoAgingTable">
+                                        <thead>
+                                            <tr id="altoAgingHeader">
+                                                <!-- Dynamic headers -->
+                                            </tr>
+                                        </thead>
+                                        <tbody id="altoAgingBody">
+                                            <!-- Data here -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>

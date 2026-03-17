@@ -632,25 +632,31 @@ tr:hover td {
     /* ... existing mobile styles ... */
 
     /* Mantener tablas en modo horizontal con scroll si es necesario */
-    .summary-table-container, .goles-table-container {
+    .summary-table-container,
+    .goles-table-container {
         -webkit-overflow-scrolling: touch;
     }
 
-    .summary-table, .goles-table {
+    .summary-table,
+    .goles-table {
         display: table !important;
-        min-width: 600px; /* Asegurar un ancho mínimo para que sea legible al scrollear */
+        min-width: 600px;
+        /* Asegurar un ancho mínimo para que sea legible al scrollear */
     }
 
-    .summary-table thead, .goles-table thead {
+    .summary-table thead,
+    .goles-table thead {
         display: table-header-group !important;
         position: static !important;
     }
 
-    .summary-table tbody, .goles-table tbody {
+    .summary-table tbody,
+    .goles-table tbody {
         display: table-row-group !important;
     }
 
-    .summary-table tr, .goles-table tr {
+    .summary-table tr,
+    .goles-table tr {
         display: table-row !important;
         margin-bottom: 0;
         border: none;
@@ -658,7 +664,8 @@ tr:hover td {
         box-shadow: none;
     }
 
-    .summary-table td, .goles-table td {
+    .summary-table td,
+    .goles-table td {
         display: table-cell !important;
         padding: 0.5rem !important;
         text-align: center !important;
@@ -667,26 +674,30 @@ tr:hover td {
         width: auto !important;
     }
 
-    .summary-table td::before, .goles-table td::before {
+    .summary-table td::before,
+    .goles-table td::before {
         display: none !important;
     }
 
-    .summary-table .model-col, .goles-table td:first-child {
+    .summary-table .model-col,
+    .goles-table td:first-child {
         position: sticky !important;
         left: 0;
         z-index: 5;
         background: #f1f5f9 !important;
         text-align: left !important;
         min-width: 120px !important;
-        box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
     }
 
-    .summary-table th:first-child, .goles-table th:first-child {
+    .summary-table th:first-child,
+    .goles-table th:first-child {
         position: sticky !important;
         left: 0;
         top: 0;
         z-index: 20;
-        background: #94a3b8 !important; /* Color gris oscuro para cabecera fija */
+        background: #94a3b8 !important;
+        /* Color gris oscuro para cabecera fija */
         color: white !important;
     }
 
@@ -715,11 +726,13 @@ tr:hover td {
         overflow-x: auto;
         white-space: nowrap;
         padding: 0.4rem;
-        scrollbar-width: none; /* Firefox */
+        scrollbar-width: none;
+        /* Firefox */
     }
-    
+
     .view-nav::-webkit-scrollbar {
-        display: none; /* Chrome/Safari */
+        display: none;
+        /* Chrome/Safari */
     }
 
     .header-actions {
@@ -743,6 +756,7 @@ tr:hover td {
 
     .charts-grid {
         grid-template-columns: 1fr;
+
     }
 
     .chart-container {
@@ -762,7 +776,7 @@ tr:hover td {
     }
 
     /* Table adjustments for mobile */
-    .summary-table th, 
+    .summary-table th,
     .summary-table td,
     .goles-table th,
     .goles-table td {
@@ -792,8 +806,19 @@ tr:hover td {
     }
 
     /* Background blobs adjustment */
-    .blur-1 { width: 300px; height: 300px; top: -100px; right: -50px; }
-    .blur-2 { width: 250px; height: 250px; bottom: -80px; left: -50px; }
+    .blur-1 {
+        width: 300px;
+        height: 300px;
+        top: -100px;
+        right: -50px;
+    }
+
+    .blur-2 {
+        width: 250px;
+        height: 250px;
+        bottom: -80px;
+        left: -50px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -815,8 +840,28 @@ tr:hover td {
     .view-nav {
         margin-bottom: 0.5rem;
     }
-    
+
     .card {
         border-radius: 12px;
     }
+}
+
+/* Download buttons */
+.btn-excel-compact {
+    background: var(--success) !important;
+    color: white !important;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+    transition: all 0.3s ease;
+}
+
+.btn-excel-compact:hover {
+    background: #059669 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
 }
