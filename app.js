@@ -299,6 +299,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnExportPPT = document.getElementById('btnExportPPT');
     if (btnExportPPT) btnExportPPT.addEventListener('click', exportToPPT);
 
+    const btnDownloadAltoAging = document.getElementById('btnDownloadAltoAging');
+    if (btnDownloadAltoAging) btnDownloadAltoAging.addEventListener('click', downloadAltoAgingCSV);
+
     // No export to excel button found in HTML, so we remove the listener to avoid errors
 
     const btnToggleEdit = document.getElementById('btnToggleEdit');
@@ -1478,6 +1481,102 @@ function renderAltoAgingChart(data) {
             }
         }]
     });
+
+    // Render the compact table
+    renderAltoAgingTable(data, activeBuckets, sortedModels);
+}
+
+/**
+ * Renders the compact table for Alto Aging: Rows = Aging Buckets, Columns = Models.
+ */
+function renderAltoAgingTable(data, buckets, models) {
+    const header = document.getElementById('altoAgingTableHeader');
+    const body = document.getElementById('altoAgingTableBody');
+    const foot = document.getElementById('altoAgingTableFoot');
+    if (!header || !body || !foot) return;
+
+    // 1. Headers
+    header.innerHTML = `
+        <th>AGING BUCKET</th>
+        ${models.map(m => `<th>${m}</th>`).join('')}
+    `;
+
+    // 2. Body
+    let bodyHtml = "";
+    buckets.forEach(bucket => {
+        let rowHtml = `<tr><td style="font-weight: 600;">${bucket}</td>`;
+        models.forEach(model => {
+            const count = data[bucket][model] || 0;
+            rowHtml += `<td>${count}</td>`;
+        });
+        rowHtml += `</tr>`;
+        bodyHtml += rowHtml;
+    });
+    body.innerHTML = bodyHtml;
+
+    // 3. Footer (Totals)
+    const totalsByModel = models.map(model => {
+        return buckets.reduce((sum, bucket) => sum + (data[bucket][model] || 0), 0);
+    });
+
+    foot.innerHTML = `
+        <tr class="total-row">
+            <td style="font-weight: 800;">TOTAL</td>
+            ${totalsByModel.map(t => `<td style="font-weight: 800;">${t}</td>`).join('')}
+        </tr>
+    `;
+}
+
+/**
+ * Downloads Alto Aging data as CSV.
+ */
+function downloadAltoAgingCSV() {
+    const stored = window.dashboard_storage;
+    if (!stored || !stored.altoAgingData) {
+        updateStatus('No hay datos para descargar', 'error');
+        return;
+    }
+
+    const data = stored.altoAgingData;
+    const activeBuckets = AGING_CATEGORIES.filter(cat => data[cat]);
+    const modelSet = new Set();
+    activeBuckets.forEach(cat => Object.keys(data[cat]).forEach(m => modelSet.add(m)));
+    const sortedModels = Array.from(modelSet).sort();
+
+    if (activeBuckets.length === 0) {
+        updateStatus('No hay datos de Alto Aging procesados', 'error');
+        return;
+    }
+
+    // Prepare CSV Content
+    let csv = "AGING BUCKET," + sortedModels.join(",") + "\n";
+    
+    activeBuckets.forEach(bucket => {
+        let row = [bucket];
+        sortedModels.forEach(model => {
+            row.push(data[bucket][model] || 0);
+        });
+        csv += row.join(",") + "\n";
+    });
+
+    // Add Total Row
+    let totalRow = ["TOTAL"];
+    sortedModels.forEach(model => {
+        const total = activeBuckets.reduce((sum, bucket) => sum + (data[bucket][model] || 0), 0);
+        totalRow.push(total);
+    });
+    csv += totalRow.join(",") + "\n";
+
+    // Trigger Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Alto_Aging_Report_${stored.weekId}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    updateStatus('Datos de Alto Aging descargados (CSV)', 'success');
 }
 
 
