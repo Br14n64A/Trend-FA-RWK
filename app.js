@@ -1577,7 +1577,7 @@ function downloadAltoAgingCSV() {
     csv += totalRow.join(",") + "\n\n";
 
     // --- Part 2: Detailed Raw Data ---
-    if (details.length > 0) {
+    if (details && details.length > 0) {
         csv += "--- DATOS DETALLADOS (FILAS QUE LLENAN LA TABLA) ---\n";
         const keys = Object.keys(details[0]);
         csv += keys.join(",") + "\n";
