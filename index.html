@@ -8,11 +8,11 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     
-    <!-- Library Loading from local libs (More reliable in corporate/Azure environments) -->
-    <script src="libs/chart.js"></script>
-    <script src="libs/xlsx.full.min.js"></script>
-    <script src="libs/exceljs.min.js"></script>
-    <script src="libs/pptxgen.bundle.js"></script>
+    <!-- Library Loading with Fallback -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="this.src='libs/chart.js'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" onerror="this.src='libs/xlsx.full.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js" onerror="this.src='libs/exceljs.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js" onerror="this.src='libs/pptxgen.bundle.js'"></script>
     
     <script>
         window.addEventListener('load', () => {
@@ -22,13 +22,10 @@
                 ExcelJS: typeof ExcelJS !== 'undefined',
                 PptxGenJS: typeof PptxGenJS !== 'undefined'
             };
-            console.log('--- PCBA Dashboard DEBUG info ---');
-            console.log('Script Sources: LOCAL');
-            console.log('Libraries Loaded:', status);
+            console.log('Library Load Status:', status);
             
-            if (!status.Chart || !status.XLSX || !status.PptxGenJS) {
-                console.error('Critical library missing!', status);
-                alert('Error crítico: No se pudieron cargar las librerías necesarias (Chart: ' + status.Chart + ', XLSX: ' + status.XLSX + ', PptxGen: ' + status.PptxGenJS + ').');
+            if (!status.Chart || !status.XLSX) {
+                alert('Error crítico: No se pudieron cargar las librerías necesarias. Verifique su conexión a internet o asegúrese de que la carpeta "libs" esté presente en el servidor.');
             }
         });
     </script>
@@ -152,25 +149,10 @@
                                 <h2>Alto Aging por Modelo</h2>
                                 <div class="header-tags">
                                     <span class="pill" id="altoAgingTotal">Total: 0</span>
-                                    <button class="nav-btn btn-excel-compact" id="btnDownloadAltoAging" title="Descargar datos de Alto Aging">📥 Descargar</button>
                                 </div>
                             </div>
-                            <div class="first-content-layout">
-                                <div class="chart-container-compact">
-                                    <canvas id="altoAgingChart"></canvas>
-                                </div>
-                                <div class="first-table-container">
-                                    <table class="compact-table" id="altoAgingTable">
-                                        <thead>
-                                            <tr id="altoAgingHeader">
-                                                <!-- Dynamic headers -->
-                                            </tr>
-                                        </thead>
-                                        <tbody id="altoAgingBody">
-                                            <!-- Data here -->
-                                        </tbody>
-                                    </table>
-                                </div>
+                            <div class="chart-container" style="height: 380px;">
+                                <canvas id="altoAgingChart"></canvas>
                             </div>
                         </div>
                     </div>

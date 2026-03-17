@@ -207,7 +207,7 @@ function getCategory(rawModel) {
     }
 
     // Fallback logic by name keyword matching
-    const mappedName = getMappedName(rawModel).toUpperCase().replace(/-/g, ' ');
+    const mappedName = getMappedName(rawModel).toUpperCase();
     
     if (mappedName.includes("NOGA") || mappedName.includes("MAKALU MB")) return "NOGA";
     if (mappedName.includes("JUPITER")) return "JUPITER";
@@ -220,10 +220,11 @@ function getCategory(rawModel) {
     if (mappedName.includes("UPDB")) return "UPDB";
     if (mappedName.includes("SPARROW") || mappedName.includes("MB") || mappedName.includes("SWAN") || mappedName.includes("TPM")) return "MB";
 
-    if (mappedName !== 'UNKNOWN' && mappedName !== upperTrimmed.replace(/-/g, ' ')) {
+    if (mappedName !== 'UNKNOWN' && mappedName !== trimmed.toUpperCase()) {
         console.warn(`[getCategory] Model not categorized: ${rawModel} (${mappedName})`);
     }
     
+    // If it's a model number but not in our list, try to return its base name
     return "OTHER";
 }
 
@@ -298,17 +299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnExportPPT = document.getElementById('btnExportPPT');
     if (btnExportPPT) btnExportPPT.addEventListener('click', exportToPPT);
 
-    const btnDownloadAltoAging = document.getElementById('btnDownloadAltoAging');
-    if (btnDownloadAltoAging) {
-        btnDownloadAltoAging.addEventListener('click', () => {
-            const stored = window.dashboard_storage;
-            if (stored && stored.altoAgingDetails) {
-                exportAltoAgingDetailsToExcel(stored.altoAgingDetails, stored.altoAgingHeaders);
-            } else {
-                alert('No hay datos detallados de Alto Aging para descargar.');
-            }
-        });
-    }
+    // No export to excel button found in HTML, so we remove the listener to avoid errors
 
     const btnToggleEdit = document.getElementById('btnToggleEdit');
     if (btnToggleEdit) {
@@ -526,12 +517,12 @@ function getWeekId(date = new Date()) {
     return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
+
 async function checkWeeklyReset() {
     const currentWeekId = getWeekId();
-    const APP_VERSION = "5.1"; // Updated for data protection fixes
+    const APP_VERSION = "5.0";
 
     if (!window.dashboard_storage) {
-        console.warn("[checkWeeklyReset] Storage not found, creating new one.");
         window.dashboard_storage = { 
             version: APP_VERSION, 
             weekId: currentWeekId, 
@@ -542,64 +533,50 @@ async function checkWeeklyReset() {
     }
 
     let stored = window.dashboard_storage;
-    console.log(`[checkWeeklyReset] Current Week: ${currentWeekId}, Stored Week: ${stored.weekId}`);
 
     // 1. LOGICA DE REINICIO SEMANAL
+    // Si la semana guardada es diferente a la actual, se archiva y se limpia.
     if (stored.weekId && stored.weekId !== currentWeekId) {
-        console.log(`[RESET] Moving from ${stored.weekId} to ${currentWeekId}`);
+        console.log(`Cambio de semana detectado: ${stored.weekId} -> ${currentWeekId}`);
         updateStatus(`Nueva semana: Archivando ${stored.weekId}...`, 'info');
 
-        // Backup to history
+        // Crear respaldo en historial
         const snapshot = JSON.parse(JSON.stringify(stored));
         delete snapshot.history; 
         stored.history = stored.history || [];
         stored.history.unshift(snapshot);
-        if (stored.history.length > 20) stored.history.pop();
+        if (stored.history.length > 20) stored.history.pop(); // Guardar hasta 20 semanas
 
         // ACCION: Mover datos del Viernes a VIE ANT (Previous Friday)
-        // Solo sobreescribimos si la semana que terminó tuvo ALGO de actividad.
-        let weekHadData = false;
+        stored.prevFridayData = stored.prevFridayData || {};
         CATEGORIES.forEach(cat => {
-            WEEK_DAYS.forEach(day => {
-                const val = (stored.data[cat] && stored.data[cat][day]) || 0;
-                if (val > 0) weekHadData = true;
-            });
-        });
+            const lastFridayCount = (stored.data[cat] && stored.data[cat]["VIERNES"]) || 0;
+            const lastThursdayCount = (stored.data[cat] && stored.data[cat]["JUEVES"]) || 0;
+            
+            // Determinar tendencia del viernes antes de limpiar
+            let trend = "trend-equal";
+            if (lastFridayCount < lastThursdayCount) trend = "trend-down";
+            else if (lastFridayCount > lastThursdayCount) trend = "trend-up";
 
-        if (weekHadData) {
-            console.log("[RESET] Previous week had data. Updating VIE ANT column.");
-            stored.prevFridayData = stored.prevFridayData || {};
-            CATEGORIES.forEach(cat => {
-                const lastFridayCount = (stored.data[cat] && stored.data[cat]["VIERNES"]) || 0;
-                const lastThursdayCount = (stored.data[cat] && stored.data[cat]["JUEVES"]) || 0;
-                
-                let trend = "trend-equal";
-                if (lastFridayCount < lastThursdayCount) trend = "trend-down";
-                else if (lastFridayCount > lastThursdayCount) trend = "trend-up";
+            // Guardamos para la comparación de la nueva semana
+            stored.prevFridayData[cat] = {
+                count: lastFridayCount,
+                trend: trend
+            };
 
-                stored.prevFridayData[cat] = {
-                    count: lastFridayCount,
-                    trend: trend
-                };
-            });
-        } else {
-            console.warn("[RESET] Previous week was empty. Keeping old VIE ANT data.");
-        }
-
-        // Reiniciar datos para la nueva semana
-        CATEGORIES.forEach(cat => {
+            // Reiniciar casillas para la nueva semana
             stored.data[cat] = {};
             WEEK_DAYS.forEach(day => stored.data[cat][day] = 0);
         });
 
         stored.weekId = currentWeekId;
         await saveStateToServer();
-        console.log("[RESET] Completed.");
+        console.log("Dashboard reiniciado para la nueva semana.");
     } else if (!stored.weekId) {
         stored.weekId = currentWeekId;
     }
 
-    // 2. ASEGURAR INTEGRIDAD DE DATOS
+    // 2. ASEGURAR INTEGRIDAD DE DATOS (Categorías faltantes)
     let added = false;
     stored.data = stored.data || {};
     stored.prevFridayData = stored.prevFridayData || {};
@@ -610,7 +587,7 @@ async function checkWeeklyReset() {
             WEEK_DAYS.forEach(day => stored.data[cat][day] = 0);
             added = true;
         }
-        if (stored.prevFridayData[cat] === undefined) {
+        if (!stored.prevFridayData[cat]) {
             stored.prevFridayData[cat] = { count: 0, trend: "trend-equal" };
             added = true;
         }
@@ -620,8 +597,10 @@ async function checkWeeklyReset() {
         stored.version = APP_VERSION;
         await saveStateToServer();
     }
-}
 
+    const weekPill = document.getElementById('currentWeekPill');
+    if (weekPill) weekPill.textContent = currentWeekId;
+}
 
 
 function handleFileUpload(e) {
@@ -701,8 +680,8 @@ function handleFileUpload(e) {
             }
 
             // 7. Alto-Aging (from Sheet 1, col M & U, with IFS on col H and XLOOKUP from MRB)
-            const aaResult = processAltoAging(statusRows, mrbRows);
-            renderAltoAgingChart(aaResult.summary);
+            const altoAgingData = processAltoAging(statusRows, mrbRows);
+            renderAltoAgingChart(altoAgingData);
 
             renderDashboard(entradasData, salidasData, firstData);
             if (golesData.length > 0) {
@@ -715,9 +694,7 @@ function handleFileUpload(e) {
             stored.salidasData = salidasData;
             stored.firstData = firstData;
             stored.golesData = golesData;
-            stored.altoAgingData = aaResult.summary;
-            stored.altoAgingDetails = aaResult.details;
-            stored.altoAgingHeaders = statusRows[0];
+            stored.altoAgingData = altoAgingData;
             saveStateToServer();
 
             updateStatus('File processed successfully', 'success');
@@ -941,18 +918,28 @@ async function updateAccumulatedData() {
     let effectiveDate = new Date(now);
 
     // Determine the effective day for data accumulation (Monday-Friday)
-    let targetDayIndex; 
-    
-    // If it's Saturday or Sunday, map to next Monday
+    // If it's Saturday (6) or Sunday (0), data should be accumulated for the next Monday.
+    // If it's a weekday, it's for that day.
+    let targetDayIndex; // 0 for LUNES, 1 for MARTES, etc.
+
     if (currentDayOfWeek === 0) { // Sunday
+        effectiveDate.setDate(effectiveDate.getDate() + 1); // Move to Monday
         targetDayIndex = 0; // LUNES
     } else if (currentDayOfWeek === 6) { // Saturday
+        effectiveDate.setDate(effectiveDate.getDate() + 2); // Move to Monday
         targetDayIndex = 0; // LUNES
-    } else { 
-        // It's Monday-Friday. We use the actual day.
-        // We REMOVE the automatic holiday-shifting here because if a file is being uploaded TODAY,
-        // it means we want to see TODAY's status regardless if it's a holiday in the calendar.
-        targetDayIndex = currentDayOfWeek - 1; 
+    } else { // Monday (1) to Friday (5)
+        targetDayIndex = currentDayOfWeek - 1; // Map 1->0, 2->1, ..., 5->4
+    }
+
+    // Adjust for holidays: if the effectiveDate is a holiday, move to the next working day
+    while (isHoliday(effectiveDate) || effectiveDate.getDay() === 0 || effectiveDate.getDay() === 6) {
+        effectiveDate.setDate(effectiveDate.getDate() + 1);
+        // Recalculate targetDayIndex based on the new effectiveDate's day of week
+        const newDayOfWeek = effectiveDate.getDay();
+        if (newDayOfWeek >= 1 && newDayOfWeek <= 5) { // If it's a weekday
+            targetDayIndex = newDayOfWeek - 1;
+        }
     }
 
     if (targetDayIndex < 0 || targetDayIndex >= WEEK_DAYS.length) {
@@ -1313,12 +1300,11 @@ function applyXlookup(colAValue, mrbRows) {
  * @param {Array[]} mrbRows - All rows from MRB sheet (may be empty array)
  */
 function processAltoAging(rows, mrbRows = []) {
-    const summary = {};
-    const details = [];
-    if (!rows || rows.length < 2) return { summary, details };
+    const result = {};
+    if (!rows || rows.length < 2) return result;
 
     // Initialise all buckets so order is guaranteed
-    AGING_CATEGORIES.forEach(cat => summary[cat] = {});
+    AGING_CATEGORIES.forEach(cat => result[cat] = {});
 
     // Skip header row (index 0)
     for (let i = 1; i < rows.length; i++) {
@@ -1333,16 +1319,21 @@ function processAltoAging(rows, mrbRows = []) {
         if (colV) continue;
 
         // ── Aging bucket resolution ──
+        // Priority: col U (index 20) if it has a recognised value;
+        // otherwise fall back to IFS formula on col H (index 7).
         let rawAging = String(row[20] || '').trim().toUpperCase();
         let bucket = AGING_CATEGORIES.find(cat => rawAging === cat || rawAging.startsWith(cat));
 
         if (!bucket) {
+            // Apply IFS formula on col H (index 7)
             const colH = row[7];
             bucket = applyIfsFormula(colH);
+            // Make sure the IFS result is a recognised category
             if (!AGING_CATEGORIES.includes(bucket)) continue;
         }
 
         // ── Model resolution ──
+        // 1. Try XLOOKUP: search col A of this row in MRB col L → get MRB col A value
         const colA = String(row[0] || '').trim();
         let resolvedModel = '';
 
@@ -1350,22 +1341,23 @@ function processAltoAging(rows, mrbRows = []) {
             resolvedModel = applyXlookup(colA, mrbRows);
         }
 
+        // 2. If XLOOKUP didn't find a result, fall back to col M (index 12)
         const rawModel = resolvedModel || String(row[12] || '').trim();
         if (!rawModel) continue;
 
+        // 3. Map the model to a category (MB, NOGA, MOBO, etc.)
         const modelName = getCategory(rawModel);
         if (modelName === 'OTHER') continue;
 
-        summary[bucket][modelName] = (summary[bucket][modelName] || 0) + 1;
-        details.push(row);
+        result[bucket][modelName] = (result[bucket][modelName] || 0) + 1;
     }
 
     // Remove empty buckets
     AGING_CATEGORIES.forEach(cat => {
-        if (Object.keys(summary[cat]).length === 0) delete summary[cat];
+        if (Object.keys(result[cat]).length === 0) delete result[cat];
     });
 
-    return { summary, details };
+    return result;
 }
 
 /**
@@ -1486,121 +1478,6 @@ function renderAltoAgingChart(data) {
             }
         }]
     });
-
-    // Render the table below or next to the chart
-    renderAltoAgingTable(data, activeBuckets, sortedModels, bucketTotals);
-}
-
-/**
- * Renders a compact table for Alto Aging data.
- */
-function renderAltoAgingTable(data, activeBuckets, sortedModels, bucketTotals) {
-    const headerRow = document.getElementById('altoAgingHeader');
-    const body = document.getElementById('altoAgingBody');
-    if (!headerRow || !body) return;
-
-    // Build headers
-    headerRow.innerHTML = '<th>Aging Bucket</th>';
-    sortedModels.forEach(model => {
-        headerRow.innerHTML += `<th>${model}</th>`;
-    });
-    headerRow.innerHTML += '<th>Total</th>';
-
-    // Build rows
-    body.innerHTML = '';
-    activeBuckets.forEach(cat => {
-        let rowHtml = `<tr><td><strong>${cat}</strong></td>`;
-        sortedModels.forEach(model => {
-            const val = data[cat][model] || 0;
-            rowHtml += `<td>${val}</td>`;
-        });
-        rowHtml += `<td><strong>${bucketTotals[cat]}</strong></td></tr>`;
-        body.innerHTML += rowHtml;
-    });
-
-    // Subtotal row
-    let subtotalHtml = `<tr style="background: rgba(0,0,0,0.05)"><td><strong>TOTAL</strong></td>`;
-    let grandTotal = 0;
-    sortedModels.forEach(model => {
-        let modelTotal = 0;
-        activeBuckets.forEach(cat => {
-            modelTotal += (data[cat][model] || 0);
-        });
-        subtotalHtml += `<td><strong>${modelTotal}</strong></td>`;
-        grandTotal += modelTotal;
-    });
-    subtotalHtml += `<td><strong>${grandTotal}</strong></td></tr>`;
-    body.innerHTML += subtotalHtml;
-}
-
-/**
- * Exports Alto Aging summary to Excel.
- */
-/**
- * Exports Alto Aging detail rows to Excel.
- */
-async function exportAltoAgingDetailsToExcel(details, headers) {
-    if (typeof ExcelJS === 'undefined') {
-        alert('La librería ExcelJS no está cargada.');
-        return;
-    }
-
-    if (!details || details.length === 0) {
-        alert('No hay datos detallados para exportar.');
-        return;
-    }
-
-    try {
-        const workbook = new ExcelJS.Workbook();
-        const sheet = workbook.addWorksheet('Alto Aging Details');
-
-        // Styles
-        const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE11D48' } };
-        const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true };
-        const border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' }
-        };
-
-        // Add headers (use provided headers or indices as fallback)
-        const headerValues = headers || details[0].map((_, i) => `Column ${i + 1}`);
-        const headerRow = sheet.addRow(headerValues);
-        headerRow.eachCell((cell) => {
-            cell.fill = headerFill;
-            cell.font = headerFont;
-            cell.border = border;
-            cell.alignment = { horizontal: 'center' };
-        });
-
-        // Add detail rows
-        details.forEach(row => {
-            const excelRow = sheet.addRow(row);
-            excelRow.eachCell((cell) => {
-                cell.border = border;
-            });
-        });
-
-        // Auto-size columns (rough estimate based on header length)
-        sheet.columns.forEach(column => {
-            column.width = 20;
-        });
-
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const weekStr = getWeekId();
-        a.download = `Alto_Aging_Details_${weekStr}.xlsx`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-
-    } catch (e) {
-        console.error('Error exporting Alto Aging details:', e);
-        alert('Error al exportar los detalles a Excel.');
-    }
 }
 
 
@@ -1613,9 +1490,10 @@ function renderSummaryTable() {
     const header = document.getElementById('summaryHeader');
     const body = document.getElementById('summaryBody');
 
+    const weekLabel = stored.weekId.split('-')[1] || stored.weekId;
     header.innerHTML = `
         <th>Modelo</th>
-        <th>VIE ANT <small style="display:block; font-size: 0.6em; opacity: 0.7;">(Sem. Ant: ${stored.weekId})</small></th>
+        <th>${weekLabel} (Vie Ant)</th>
         ${WEEK_DAYS.map(d => `<th class="day-header">${d}</th>`).join('')}
     `;
 
