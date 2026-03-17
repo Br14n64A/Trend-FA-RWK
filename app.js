@@ -526,12 +526,12 @@ function getWeekId(date = new Date()) {
     return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
-
 async function checkWeeklyReset() {
     const currentWeekId = getWeekId();
-    const APP_VERSION = "5.0";
+    const APP_VERSION = "5.1"; // Updated for data protection fixes
 
     if (!window.dashboard_storage) {
+        console.warn("[checkWeeklyReset] Storage not found, creating new one.");
         window.dashboard_storage = { 
             version: APP_VERSION, 
             weekId: currentWeekId, 
@@ -542,31 +542,32 @@ async function checkWeeklyReset() {
     }
 
     let stored = window.dashboard_storage;
+    console.log(`[checkWeeklyReset] Current Week: ${currentWeekId}, Stored Week: ${stored.weekId}`);
 
     // 1. LOGICA DE REINICIO SEMANAL
-    // Si la semana guardada es diferente a la actual, se archiva y se limpia.
     if (stored.weekId && stored.weekId !== currentWeekId) {
-        console.log(`Cambio de semana detectado: ${stored.weekId} -> ${currentWeekId}`);
+        console.log(`[RESET] Moving from ${stored.weekId} to ${currentWeekId}`);
         updateStatus(`Nueva semana: Archivando ${stored.weekId}...`, 'info');
 
-        // Crear respaldo en historial
+        // Backup to history
         const snapshot = JSON.parse(JSON.stringify(stored));
         delete snapshot.history; 
         stored.history = stored.history || [];
         stored.history.unshift(snapshot);
-        if (stored.history.length > 20) stored.history.pop(); // Guardar hasta 20 semanas
+        if (stored.history.length > 20) stored.history.pop();
 
         // ACCION: Mover datos del Viernes a VIE ANT (Previous Friday)
         // Solo sobreescribimos si la semana que terminó tuvo ALGO de actividad.
-        // Si toda la semana estuvo en 0, mantenemos el VIE ANT que ya teníamos.
         let weekHadData = false;
         CATEGORIES.forEach(cat => {
             WEEK_DAYS.forEach(day => {
-                if ((stored.data[cat] && stored.data[cat][day]) > 0) weekHadData = true;
+                const val = (stored.data[cat] && stored.data[cat][day]) || 0;
+                if (val > 0) weekHadData = true;
             });
         });
 
         if (weekHadData) {
+            console.log("[RESET] Previous week had data. Updating VIE ANT column.");
             stored.prevFridayData = stored.prevFridayData || {};
             CATEGORIES.forEach(cat => {
                 const lastFridayCount = (stored.data[cat] && stored.data[cat]["VIERNES"]) || 0;
@@ -581,9 +582,11 @@ async function checkWeeklyReset() {
                     trend: trend
                 };
             });
+        } else {
+            console.warn("[RESET] Previous week was empty. Keeping old VIE ANT data.");
         }
 
-        // Reiniciar casillas para la nueva semana (esto se hace siempre)
+        // Reiniciar datos para la nueva semana
         CATEGORIES.forEach(cat => {
             stored.data[cat] = {};
             WEEK_DAYS.forEach(day => stored.data[cat][day] = 0);
@@ -591,12 +594,12 @@ async function checkWeeklyReset() {
 
         stored.weekId = currentWeekId;
         await saveStateToServer();
-        console.log("Dashboard reiniciado para la nueva semana.");
+        console.log("[RESET] Completed.");
     } else if (!stored.weekId) {
         stored.weekId = currentWeekId;
     }
 
-    // 2. ASEGURAR INTEGRIDAD DE DATOS (Categorías faltantes)
+    // 2. ASEGURAR INTEGRIDAD DE DATOS
     let added = false;
     stored.data = stored.data || {};
     stored.prevFridayData = stored.prevFridayData || {};
@@ -607,7 +610,7 @@ async function checkWeeklyReset() {
             WEEK_DAYS.forEach(day => stored.data[cat][day] = 0);
             added = true;
         }
-        if (!stored.prevFridayData[cat]) {
+        if (stored.prevFridayData[cat] === undefined) {
             stored.prevFridayData[cat] = { count: 0, trend: "trend-equal" };
             added = true;
         }
@@ -617,10 +620,8 @@ async function checkWeeklyReset() {
         stored.version = APP_VERSION;
         await saveStateToServer();
     }
-
-    const weekPill = document.getElementById('currentWeekPill');
-    if (weekPill) weekPill.textContent = currentWeekId;
 }
+
 
 
 function handleFileUpload(e) {
@@ -1612,10 +1613,9 @@ function renderSummaryTable() {
     const header = document.getElementById('summaryHeader');
     const body = document.getElementById('summaryBody');
 
-    const weekLabel = stored.weekId.split('-')[1] || stored.weekId;
     header.innerHTML = `
         <th>Modelo</th>
-        <th>${weekLabel} (Vie Ant)</th>
+        <th>VIE ANT <small style="display:block; font-size: 0.6em; opacity: 0.7;">(Sem. Ant: ${stored.weekId})</small></th>
         ${WEEK_DAYS.map(d => `<th class="day-header">${d}</th>`).join('')}
     `;
 
