@@ -8,11 +8,11 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     
-    <!-- Library Loading from Cloudflare (More reliable in corporate/Azure environments) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Library Loading from local libs (More reliable in corporate/Azure environments) -->
+    <script src="libs/chart.js?v=5.2" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="libs/xlsx.full.min.js?v=5.2" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="libs/exceljs.min.js?v=5.2" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="libs/pptxgen.bundle.js?v=5.2" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     
     <script>
         window.addEventListener('load', () => {
@@ -22,10 +22,13 @@
                 ExcelJS: typeof ExcelJS !== 'undefined',
                 PptxGenJS: typeof PptxGenJS !== 'undefined'
             };
-            console.log('Library Load Status:', status);
+            console.log('--- PCBA Dashboard DEBUG info ---');
+            console.log('Script Sources: LOCAL');
+            console.log('Libraries Loaded:', status);
             
-            if (!status.Chart || !status.XLSX) {
-                alert('Error crítico: No se pudieron cargar las librerías necesarias. Verifique su conexión a internet o asegúrese de que la carpeta "libs" esté presente en el servidor.');
+            if (!status.Chart || !status.XLSX || !status.PptxGenJS) {
+                console.error('Critical library missing!', status);
+                alert('Error crítico: No se pudieron cargar las librerías necesarias (Chart: ' + status.Chart + ', XLSX: ' + status.XLSX + ', PptxGen: ' + status.PptxGenJS + ').');
             }
         });
     </script>
@@ -224,7 +227,7 @@
         </main>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=5.2"></script>
 </body>
 
 </html>
