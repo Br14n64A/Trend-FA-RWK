@@ -729,39 +729,20 @@ tr:hover td {
         flex-wrap: wrap;
     }
 
+    .nav-btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+    }
+
     .btn-excel {
-        flex: none;
-        width: 44px;
-        height: 44px;
-        font-size: 1.2rem;
-        padding: 0;
-        display: flex;
+        flex: 1;
+        font-size: 0.7rem;
         justify-content: center;
-        align-items: center;
-        overflow: hidden;
-        white-space: nowrap;
-        color: transparent; /* Hide text */
+        text-align: center;
     }
 
-    .btn-excel::first-letter {
-        color: initial; /* Show only emoji/icon */
-    }
-
-    .upload-btn {
-        width: 44px;
-        height: 44px;
-        padding: 0;
-        font-size: 1.2rem;
-    }
-
-    .file-status {
-        background: transparent;
-        border: none;
-        padding: 0;
-    }
-
-    #statusText {
-        display: none; /* Hide status text on mobile */
+    .charts-grid {
+        grid-template-columns: 1fr;
     }
 
     .chart-container {
@@ -798,24 +779,16 @@ tr:hover td {
     }
 
     .first-content-layout {
-        display: flex;
-        flex-direction: column;
+        display: block;
         padding: 0.5rem;
-        gap: 1.5rem;
     }
 
-    .first-table-container, 
-    .alto-aging-table-container {
-        display: block;
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        max-height: 350px;
+    .first-table-container {
+        display: none;
     }
 
     .chart-container-compact {
         height: 300px;
-        width: 100%;
     }
 
     /* Background blobs adjustment */
@@ -825,21 +798,18 @@ tr:hover td {
 
 @media (max-width: 480px) {
     .header-actions {
-        flex-direction: row; /* Keep horizontal but wrap if needed */
-        justify-content: flex-end;
-        gap: 0.5rem;
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .upload-btn {
-        width: 44px;
+        width: 100%;
         height: 44px;
-        padding: 0;
-        font-size: 1.2rem;
     }
 
     .file-status {
-        width: auto;
-        order: -1; /* Put led first or keep it flexible */
+        width: 100%;
+        justify-content: center;
     }
 
     .view-nav {
@@ -849,27 +819,4 @@ tr:hover td {
     .card {
         border-radius: 12px;
     }
-}
-
-.btn-download {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    background-color: var(--success);
-    color: white;
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 6px;
-    font-family: inherit;
-    font-weight: 600;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-}
-
-.btn-download:hover {
-    background-color: #059669; /* Darker emerald */
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }

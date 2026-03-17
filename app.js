@@ -299,9 +299,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnExportPPT = document.getElementById('btnExportPPT');
     if (btnExportPPT) btnExportPPT.addEventListener('click', exportToPPT);
 
-    const btnDownloadAltoAging = document.getElementById('btnDownloadAltoAging');
-    if (btnDownloadAltoAging) btnDownloadAltoAging.addEventListener('click', downloadAltoAgingCSV);
-
     // No export to excel button found in HTML, so we remove the listener to avoid errors
 
     const btnToggleEdit = document.getElementById('btnToggleEdit');
@@ -695,9 +692,9 @@ function handleFileUpload(e) {
             let stored = window.dashboard_storage;
             stored.entradasData = entradasData;
             stored.salidasData = salidasData;
+            stored.firstData = firstData;
             stored.golesData = golesData;
-            stored.altoAgingData = altoAgingData.summary;
-            stored.altoAgingDetails = altoAgingData.details;
+            stored.altoAgingData = altoAgingData;
             saveStateToServer();
 
             updateStatus('File processed successfully', 'success');
@@ -1301,17 +1298,13 @@ function applyXlookup(colAValue, mrbRows) {
  * Col A (index 0)  = serial for XLOOKUP against MRB sheet.
  * @param {Array[]} rows    - All rows from Sheet 1
  * @param {Array[]} mrbRows - All rows from MRB sheet (may be empty array)
- * @returns {Object} { summary: { bucket: { model: count } }, details: Array[] }
  */
 function processAltoAging(rows, mrbRows = []) {
-    const summary = {};
-    const details = [];
-    if (!rows || rows.length < 2) return { summary, details };
-
-    const originalHeaders = rows[0];
+    const result = {};
+    if (!rows || rows.length < 2) return result;
 
     // Initialise all buckets so order is guaranteed
-    AGING_CATEGORIES.forEach(cat => summary[cat] = {});
+    AGING_CATEGORIES.forEach(cat => result[cat] = {});
 
     // Skip header row (index 0)
     for (let i = 1; i < rows.length; i++) {
@@ -1326,16 +1319,21 @@ function processAltoAging(rows, mrbRows = []) {
         if (colV) continue;
 
         // ── Aging bucket resolution ──
+        // Priority: col U (index 20) if it has a recognised value;
+        // otherwise fall back to IFS formula on col H (index 7).
         let rawAging = String(row[20] || '').trim().toUpperCase();
         let bucket = AGING_CATEGORIES.find(cat => rawAging === cat || rawAging.startsWith(cat));
 
         if (!bucket) {
+            // Apply IFS formula on col H (index 7)
             const colH = row[7];
             bucket = applyIfsFormula(colH);
+            // Make sure the IFS result is a recognised category
             if (!AGING_CATEGORIES.includes(bucket)) continue;
         }
 
         // ── Model resolution ──
+        // 1. Try XLOOKUP: search col A of this row in MRB col L → get MRB col A value
         const colA = String(row[0] || '').trim();
         let resolvedModel = '';
 
@@ -1343,31 +1341,23 @@ function processAltoAging(rows, mrbRows = []) {
             resolvedModel = applyXlookup(colA, mrbRows);
         }
 
+        // 2. If XLOOKUP didn't find a result, fall back to col M (index 12)
         const rawModel = resolvedModel || String(row[12] || '').trim();
         if (!rawModel) continue;
 
-        const modelCategory = getCategory(rawModel);
-        if (modelCategory === 'OTHER') continue;
+        // 3. Map the model to a category (MB, NOGA, MOBO, etc.)
+        const modelName = getCategory(rawModel);
+        if (modelName === 'OTHER') continue;
 
-        // Add to summary
-        summary[bucket][modelCategory] = (summary[bucket][modelCategory] || 0) + 1;
-
-        // Add to details for export
-        const detailRow = {};
-        originalHeaders.forEach((h, idx) => {
-            detailRow[h || `Col_${idx}`] = row[idx];
-        });
-        detailRow['CALCULATED_BUCKET'] = bucket;
-        detailRow['MODEL_CATEGORY'] = modelCategory;
-        details.push(detailRow);
+        result[bucket][modelName] = (result[bucket][modelName] || 0) + 1;
     }
 
     // Remove empty buckets
     AGING_CATEGORIES.forEach(cat => {
-        if (Object.keys(summary[cat]).length === 0) delete summary[cat];
+        if (Object.keys(result[cat]).length === 0) delete result[cat];
     });
 
-    return { summary, details };
+    return result;
 }
 
 /**
@@ -1488,122 +1478,6 @@ function renderAltoAgingChart(data) {
             }
         }]
     });
-
-    // Render the compact table
-    renderAltoAgingTable(data, activeBuckets, sortedModels);
-}
-
-/**
- * Renders the compact table for Alto Aging: Rows = Aging Buckets, Columns = Models.
- */
-function renderAltoAgingTable(data, buckets, models) {
-    const header = document.getElementById('altoAgingTableHeader');
-    const body = document.getElementById('altoAgingTableBody');
-    const foot = document.getElementById('altoAgingTableFoot');
-    if (!header || !body || !foot) return;
-
-    // 1. Headers
-    header.innerHTML = `
-        <th>AGING BUCKET</th>
-        ${models.map(m => `<th>${m}</th>`).join('')}
-    `;
-
-    // 2. Body
-    let bodyHtml = "";
-    buckets.forEach(bucket => {
-        let rowHtml = `<tr><td style="font-weight: 600;">${bucket}</td>`;
-        models.forEach(model => {
-            const count = data[bucket][model] || 0;
-            rowHtml += `<td>${count}</td>`;
-        });
-        rowHtml += `</tr>`;
-        bodyHtml += rowHtml;
-    });
-    body.innerHTML = bodyHtml;
-
-    // 3. Footer (Totals)
-    const totalsByModel = models.map(model => {
-        return buckets.reduce((sum, bucket) => sum + (data[bucket][model] || 0), 0);
-    });
-
-    foot.innerHTML = `
-        <tr class="total-row">
-            <td style="font-weight: 800;">TOTAL</td>
-            ${totalsByModel.map(t => `<td style="font-weight: 800;">${t}</td>`).join('')}
-        </tr>
-    `;
-}
-
-/**
- * Downloads Alto Aging data as CSV (Matrix Summary + Full Details).
- */
-function downloadAltoAgingCSV() {
-    const stored = window.dashboard_storage;
-    if (!stored || !stored.altoAgingData) {
-        updateStatus('No hay datos para descargar', 'error');
-        return;
-    }
-
-    const data = stored.altoAgingData;
-    const details = stored.altoAgingDetails || [];
-    const activeBuckets = AGING_CATEGORIES.filter(cat => data[cat]);
-    const modelSet = new Set();
-    activeBuckets.forEach(cat => Object.keys(data[cat]).forEach(m => modelSet.add(m)));
-    const sortedModels = Array.from(modelSet).sort();
-
-    if (activeBuckets.length === 0) {
-        updateStatus('No hay datos de Alto Aging procesados', 'error');
-        return;
-    }
-
-    // --- Part 1: Matrix Summary ---
-    let csv = "--- RESUMEN MATRIZ ALTO AGING ---\n";
-    csv += "AGING BUCKET," + sortedModels.join(",") + "\n";
-    
-    activeBuckets.forEach(bucket => {
-        let row = [bucket];
-        sortedModels.forEach(model => {
-            row.push(data[bucket][model] || 0);
-        });
-        csv += row.join(",") + "\n";
-    });
-
-    // Matrix Totals
-    let totalRow = ["TOTAL"];
-    sortedModels.forEach(model => {
-        const total = activeBuckets.reduce((sum, bucket) => sum + (data[bucket][model] || 0), 0);
-        totalRow.push(total);
-    });
-    csv += totalRow.join(",") + "\n\n";
-
-    // --- Part 2: Detailed Raw Data ---
-    if (details && details.length > 0) {
-        csv += "--- DATOS DETALLADOS (FILAS QUE LLENAN LA TABLA) ---\n";
-        const keys = Object.keys(details[0]);
-        csv += keys.join(",") + "\n";
-        
-        details.forEach(d => {
-            const row = keys.map(k => {
-                let val = String(d[k] || '');
-                if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-                    val = `"${val.replace(/"/g, '""')}"`;
-                }
-                return val;
-            });
-            csv += row.join(",") + "\n";
-        });
-    }
-
-    // Trigger Download
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Alto_Aging_Detailed_Report_${stored.weekId}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-    
-    updateStatus('Reporte detallado de Alto Aging descargado', 'success');
 }
 
 
@@ -1635,14 +1509,8 @@ function renderSummaryTable() {
         grandPrevTotal += prevVal;
         WEEK_DAYS.forEach(d => totalsByDay[d] += (stored.data[cat][d] || 0));
 
-        // Logic to hide rows with all zeros (unless in edit mode)
-        let hasData = prevVal > 0;
-        WEEK_DAYS.forEach(d => { if ((stored.data[cat][d] || 0) > 0) hasData = true; });
-
-        if (!hasData && !isEditMode) return null;
-
         return { cat, prevRaw: prevFridayRaw, prevVal };
-    }).filter(r => r !== null);
+    }); // Removed .filter(r => r !== null) to show all categories
 
     let html = "";
 
