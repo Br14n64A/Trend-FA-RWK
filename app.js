@@ -557,23 +557,34 @@ async function checkWeeklyReset() {
         if (stored.history.length > 20) stored.history.pop(); // Guardar hasta 20 semanas
 
         // ACCION: Mover datos del Viernes a VIE ANT (Previous Friday)
-        stored.prevFridayData = stored.prevFridayData || {};
+        // Solo sobreescribimos si la semana que terminó tuvo ALGO de actividad.
+        // Si toda la semana estuvo en 0, mantenemos el VIE ANT que ya teníamos.
+        let weekHadData = false;
         CATEGORIES.forEach(cat => {
-            const lastFridayCount = (stored.data[cat] && stored.data[cat]["VIERNES"]) || 0;
-            const lastThursdayCount = (stored.data[cat] && stored.data[cat]["JUEVES"]) || 0;
-            
-            // Determinar tendencia del viernes antes de limpiar
-            let trend = "trend-equal";
-            if (lastFridayCount < lastThursdayCount) trend = "trend-down";
-            else if (lastFridayCount > lastThursdayCount) trend = "trend-up";
+            WEEK_DAYS.forEach(day => {
+                if ((stored.data[cat] && stored.data[cat][day]) > 0) weekHadData = true;
+            });
+        });
 
-            // Guardamos para la comparación de la nueva semana
-            stored.prevFridayData[cat] = {
-                count: lastFridayCount,
-                trend: trend
-            };
+        if (weekHadData) {
+            stored.prevFridayData = stored.prevFridayData || {};
+            CATEGORIES.forEach(cat => {
+                const lastFridayCount = (stored.data[cat] && stored.data[cat]["VIERNES"]) || 0;
+                const lastThursdayCount = (stored.data[cat] && stored.data[cat]["JUEVES"]) || 0;
+                
+                let trend = "trend-equal";
+                if (lastFridayCount < lastThursdayCount) trend = "trend-down";
+                else if (lastFridayCount > lastThursdayCount) trend = "trend-up";
 
-            // Reiniciar casillas para la nueva semana
+                stored.prevFridayData[cat] = {
+                    count: lastFridayCount,
+                    trend: trend
+                };
+            });
+        }
+
+        // Reiniciar casillas para la nueva semana (esto se hace siempre)
+        CATEGORIES.forEach(cat => {
             stored.data[cat] = {};
             WEEK_DAYS.forEach(day => stored.data[cat][day] = 0);
         });
