@@ -207,7 +207,7 @@ function getCategory(rawModel) {
     }
 
     // Fallback logic by name keyword matching
-    const mappedName = getMappedName(rawModel).toUpperCase();
+    const mappedName = getMappedName(rawModel).toUpperCase().replace(/-/g, ' ');
     
     if (mappedName.includes("NOGA") || mappedName.includes("MAKALU MB")) return "NOGA";
     if (mappedName.includes("JUPITER")) return "JUPITER";
@@ -220,11 +220,10 @@ function getCategory(rawModel) {
     if (mappedName.includes("UPDB")) return "UPDB";
     if (mappedName.includes("SPARROW") || mappedName.includes("MB") || mappedName.includes("SWAN") || mappedName.includes("TPM")) return "MB";
 
-    if (mappedName !== 'UNKNOWN' && mappedName !== trimmed.toUpperCase()) {
+    if (mappedName !== 'UNKNOWN' && mappedName !== upperTrimmed.replace(/-/g, ' ')) {
         console.warn(`[getCategory] Model not categorized: ${rawModel} (${mappedName})`);
     }
     
-    // If it's a model number but not in our list, try to return its base name
     return "OTHER";
 }
 
@@ -930,28 +929,18 @@ async function updateAccumulatedData() {
     let effectiveDate = new Date(now);
 
     // Determine the effective day for data accumulation (Monday-Friday)
-    // If it's Saturday (6) or Sunday (0), data should be accumulated for the next Monday.
-    // If it's a weekday, it's for that day.
-    let targetDayIndex; // 0 for LUNES, 1 for MARTES, etc.
-
+    let targetDayIndex; 
+    
+    // If it's Saturday or Sunday, map to next Monday
     if (currentDayOfWeek === 0) { // Sunday
-        effectiveDate.setDate(effectiveDate.getDate() + 1); // Move to Monday
         targetDayIndex = 0; // LUNES
     } else if (currentDayOfWeek === 6) { // Saturday
-        effectiveDate.setDate(effectiveDate.getDate() + 2); // Move to Monday
         targetDayIndex = 0; // LUNES
-    } else { // Monday (1) to Friday (5)
-        targetDayIndex = currentDayOfWeek - 1; // Map 1->0, 2->1, ..., 5->4
-    }
-
-    // Adjust for holidays: if the effectiveDate is a holiday, move to the next working day
-    while (isHoliday(effectiveDate) || effectiveDate.getDay() === 0 || effectiveDate.getDay() === 6) {
-        effectiveDate.setDate(effectiveDate.getDate() + 1);
-        // Recalculate targetDayIndex based on the new effectiveDate's day of week
-        const newDayOfWeek = effectiveDate.getDay();
-        if (newDayOfWeek >= 1 && newDayOfWeek <= 5) { // If it's a weekday
-            targetDayIndex = newDayOfWeek - 1;
-        }
+    } else { 
+        // It's Monday-Friday. We use the actual day.
+        // We REMOVE the automatic holiday-shifting here because if a file is being uploaded TODAY,
+        // it means we want to see TODAY's status regardless if it's a holiday in the calendar.
+        targetDayIndex = currentDayOfWeek - 1; 
     }
 
     if (targetDayIndex < 0 || targetDayIndex >= WEEK_DAYS.length) {
