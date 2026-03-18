@@ -1692,7 +1692,7 @@ function renderSummaryTable() {
     WEEK_DAYS.forEach(d => totalsByDay[d] = 0);
     let grandPrevTotal = 0;
 
-    const rowData = CATEGORIES.map(cat => {
+    let rowData = CATEGORIES.map(cat => {
         const prevFridayRaw = (stored.prevFridayData && stored.prevFridayData[cat]) || 0;
         let prevVal = (typeof prevFridayRaw === 'object') ? (prevFridayRaw.count || 0) : prevFridayRaw;
 
@@ -1700,7 +1700,16 @@ function renderSummaryTable() {
         WEEK_DAYS.forEach(d => totalsByDay[d] += (stored.data[cat][d] || 0));
 
         return { cat, prevRaw: prevFridayRaw, prevVal };
-    }); // Removed .filter(r => r !== null) to show all categories
+    });
+
+    // Filtro: Si no estamos en modo edición, esconder filas que están totalmente en 0
+    if (!isEditMode) {
+        rowData = rowData.filter(item => {
+            const hasPrev = item.prevVal > 0;
+            const hasCurrentWeek = WEEK_DAYS.some(d => (stored.data[item.cat] && stored.data[item.cat][d]) > 0);
+            return hasPrev || hasCurrentWeek;
+        });
+    }
 
     let html = "";
 
