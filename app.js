@@ -600,6 +600,12 @@ async function checkWeeklyReset() {
         stored.version = APP_VERSION;
         await saveStateToServer();
     }
+    
+    // Check missing properties for processed files tracking
+    if (!stored.processedFiles) {
+        stored.processedFiles = [];
+        await saveStateToServer();
+    }
 
     const weekPill = document.getElementById('currentWeekPill');
     if (weekPill) weekPill.textContent = currentWeekId;
@@ -634,11 +640,14 @@ function handleFileUpload(e) {
             const statusSheet = workbook.Sheets[h1Name];
             const statusRows = XLSX.utils.sheet_to_json(statusSheet, { header: 1 });
             
+            // Crearemos un identificador único rápido para el archivo para evitar doble conteo
+            const fileIdentifier = `${file.name}_${file.size}_${file.lastModified}`;
+            
             if (statusRows.length > 1) {
                 headers = statusRows[0];
                 rawData = statusRows.slice(1);
                 processData();
-                await updateAccumulatedData(); // Made async and awaited
+                await updateAccumulatedData(fileIdentifier); // Made async and awaited
             }
 
             // 2. Entradas
@@ -918,9 +927,15 @@ function processData() {
     }
 }
 
-async function updateAccumulatedData() {
+async function updateAccumulatedData(fileIdentifier) {
     const stored = window.dashboard_storage;
     if (!stored) return;
+
+    // Verificar si este archivo ya fue procesado para no sumarlo dos veces
+    if (stored.processedFiles && stored.processedFiles.includes(fileIdentifier)) {
+        console.log("Archivo ya procesado previamente. No se sumarán los datos al histórico para evitar duplicados.");
+        return;
+    }
 
     const now = new Date();
     let currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -971,8 +986,16 @@ async function updateAccumulatedData() {
     });
 
     CATEGORIES.forEach(cat => {
-        stored.data[cat][todayName] = currentCounts[cat];
+        // En lugar de sobrescribir, sumamos a lo que ya hay para ese día
+        const existingData = stored.data[cat][todayName] || 0;
+        stored.data[cat][todayName] = existingData + currentCounts[cat];
     });
+
+    // Registrar archivo como procesado
+    if (!stored.processedFiles) stored.processedFiles = [];
+    stored.processedFiles.push(fileIdentifier);
+    // Mantener la lista pequeña
+    if (stored.processedFiles.length > 50) stored.processedFiles.shift();
 
     await saveStateToServer();
 }
