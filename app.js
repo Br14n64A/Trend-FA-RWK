@@ -1395,6 +1395,7 @@ function processAltoAging(rows, mrbRows = []) {
     // Guardar los datos de origen para poder exportarlos después
     if (window.dashboard_storage) {
         window.dashboard_storage.altoAgingSourceData = rows;
+        window.dashboard_storage.mrbSourceData = mrbRows;
     }
 
     return result;
@@ -1434,7 +1435,13 @@ async function exportAltoAgingToExcel() {
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
         });
 
-        // Filtrar y agregar solo filas que son FAIL y que caen en la lógica de Alto Aging
+        // Necesitamos MRB rows de nuevo si queremos ser exactos igual al chart.
+        // Como no están de forma global fácil, hacemos match con el modelName puro si cae en categoría.
+        // O mejor: guardamos el modelo resuelto durante el procesado y lo re-evaluamos o lo guardamos en el JSON original si queremos ser puristas.
+        // Por simplicidad de lectura y evitar modificar el proceso de carga, volvemos a evaluar Categoría:
+        const mrbRows = stored.mrbSourceData || [];
+
+        // Filtrar y agregar solo filas que son FAIL y que caen en la lógica de Alto Aging y tienen Modelo Válido
         for (let i = 1; i < sourceData.length; i++) {
             const row = sourceData[i];
             const colD = String(row[3] || '').toUpperCase();
@@ -1442,6 +1449,23 @@ async function exportAltoAgingToExcel() {
 
             if (!colD.includes('FAIL')) continue;
             if (colV) continue;
+
+            const colA = String(row[0] || '').trim();
+            let resolvedModel = '';
+
+            if (mrbRows.length > 0 && colA) {
+                resolvedModel = applyXlookup(colA, mrbRows);
+            }
+
+            const rawModel = resolvedModel || String(row[12] || '').trim();
+            if (!rawModel) continue;
+
+            const modelName = getCategory(rawModel);
+            // Si el modelo categorizado es OTHER, significa que NO apareció en la gráfica
+            if (modelName === 'OTHER') continue;
+
+            // Optional: Podríamos verificar el aging bucket si queremos exluír los "MENOR A 30" u otros vacíos,
+            // pero si la gráfica los muestra, también deben descargarse.
 
             const newRow = sheet.addRow(row);
             newRow.alignment = { vertical: 'middle' };
