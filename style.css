@@ -734,21 +734,37 @@ tr:hover td {
 
     .header-actions {
         width: 100%;
+        display: flex;
+        flex-direction: row;
         justify-content: space-between;
+        align-items: center;
+        flex-wrap: nowrap;
         gap: 0.5rem;
-        flex-wrap: wrap;
     }
 
     .nav-btn {
-        padding: 0.4rem 0.6rem;
+        padding: 0.4rem;
         font-size: 0.75rem;
     }
 
     .btn-excel {
-        flex: 1;
-        font-size: 0.7rem;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: flex;
         justify-content: center;
-        text-align: center;
+        align-items: center;
+        flex: none;
+    }
+
+    .upload-btn {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex: none;
     }
 
     .btn-text {
@@ -757,13 +773,14 @@ tr:hover td {
 
     .btn-icon {
         display: inline-block;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
     }
 
     .actions-group {
         display: flex;
-        width: 100%;
+        flex-direction: row;
         gap: 0.5rem;
+        flex: none;
     }
 
     .status-text-mobile-hide {
@@ -834,21 +851,6 @@ tr:hover td {
 }
 
 @media (max-width: 480px) {
-    .header-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .upload-btn {
-        width: 100%;
-        height: 44px;
-    }
-
-    .file-status {
-        width: 100%;
-        justify-content: center;
-    }
-
     .view-nav {
         margin-bottom: 0.5rem;
     }

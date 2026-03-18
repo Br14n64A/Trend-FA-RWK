@@ -154,12 +154,32 @@
                             <div class="card-header">
                                 <h2>Alto Aging por Modelo</h2>
                                 <div class="header-tags">
-                                    <button class="nav-btn btn-excel" id="btnDownloadAltoAging" title="Descargar datos originales de Alto Aging" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">⬇️ Descargar Datos</button>
+                                    <button class="nav-btn btn-excel" id="btnDownloadAltoAging" title="Descargar datos originales de Alto Aging" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
+                                        <span class="btn-text">⬇️ Descargar Datos</span>
+                                        <span class="btn-icon">⬇️</span>
+                                    </button>
                                     <span class="pill" id="altoAgingTotal">Total: 0</span>
                                 </div>
                             </div>
-                            <div class="chart-container" style="height: 380px;">
-                                <canvas id="altoAgingChart"></canvas>
+                            <div class="first-content-layout">
+                                <div class="chart-container-compact">
+                                    <canvas id="altoAgingChart"></canvas>
+                                </div>
+                                <div class="first-table-container">
+                                    <table class="compact-table" id="altoAgingTable">
+                                        <thead>
+                                            <tr id="altoAgingTableHeader">
+                                                <!-- Dynamic headers -->
+                                            </tr>
+                                        </thead>
+                                        <tbody id="altoAgingTableBody">
+                                            <!-- Data here -->
+                                        </tbody>
+                                        <tfoot id="altoAgingTableFoot">
+                                            <!-- Total row -->
+                                        </tfoot>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>

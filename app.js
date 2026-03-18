@@ -1586,6 +1586,57 @@ function renderAltoAgingChart(data) {
             }
         }]
     });
+
+    // Populate the side table
+    renderAltoAgingTable(data, activeBuckets, sortedModels);
+}
+
+function renderAltoAgingTable(data, activeBuckets, sortedModels) {
+    const headerRow = document.getElementById('altoAgingTableHeader');
+    const tableBody = document.getElementById('altoAgingTableBody');
+    const tableFoot = document.getElementById('altoAgingTableFoot');
+
+    if (!headerRow || !tableBody || !tableFoot) return;
+
+    // Build Header
+    let theadHtml = `<th>AGING BUCKET</th>`;
+    sortedModels.forEach(model => {
+        theadHtml += `<th>${model}</th>`;
+    });
+    headerRow.innerHTML = theadHtml;
+
+    // Build Body
+    let tbodyHtml = '';
+    const columnTotals = {};
+    sortedModels.forEach(m => columnTotals[m] = 0);
+    let grandTotal = 0;
+
+    // Ensure we iterate in the exact order of AGING_CATEGORIES to match the chart logic
+    AGING_CATEGORIES.forEach(bucket => {
+        if (!activeBuckets.includes(bucket)) return;
+
+        tbodyHtml += `<tr><td style="font-weight: 600;">${bucket}</td>`;
+        
+        sortedModels.forEach(model => {
+            const count = data[bucket][model] || 0;
+            tbodyHtml += `<td style="text-align: center;">${count}</td>`;
+            columnTotals[model] += count;
+            grandTotal += count;
+        });
+
+        tbodyHtml += `</tr>`;
+    });
+
+    tableBody.innerHTML = tbodyHtml;
+
+    // Build Footer (Totals)
+    let tfootHtml = `<tr><td style="font-weight: 800; border-top: 2px solid #94a3b8; background: #e2e8f0;">TOTAL</td>`;
+    sortedModels.forEach(model => {
+        tfootHtml += `<td style="text-align: center; font-weight: 800; border-top: 2px solid #94a3b8; background: #e2e8f0;">${columnTotals[model]}</td>`;
+    });
+    tfootHtml += `</tr>`;
+    
+    tableFoot.innerHTML = tfootHtml;
 }
 
 
