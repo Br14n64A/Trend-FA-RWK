@@ -8,11 +8,11 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     
-    <!-- Library Loading with Fallback -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="this.src='chart.js'"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" onerror="this.src='xlsx.full.min.js'"></script>
-    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js" onerror="this.src='exceljs.min.js'"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js" onerror="this.src='pptxgen.bundle.js'"></script>
+    <!-- Library Loading: Local files first to avoid Edge Tracking Prevention issues -->
+    <script src="chart.js" onerror="console.warn('chart.js local failed')"></script>
+    <script src="xlsx.full.min.js" onerror="console.warn('xlsx local failed')"></script>
+    <script src="exceljs.min.js" onerror="console.warn('exceljs local failed')"></script>
+    <script src="pptxgen.bundle.js" onerror="console.warn('pptxgen local failed')"></script>
     
     <script>
         window.addEventListener('load', () => {
@@ -25,7 +25,7 @@
             console.log('Library Load Status:', status);
             
             if (!status.Chart || !status.XLSX) {
-                alert('Error crítico: No se pudieron cargar las librerías necesarias. Verifique su conexión a internet o asegúrese de que la carpeta "libs" esté presente en el servidor.');
+                console.warn('Algunas librerías no se pudieron cargar localmente.');
             }
         });
     </script>
@@ -50,7 +50,7 @@
 
             <div class="header-actions">
                 <div class="actions-group">
-                    <button class="nav-btn btn-excel" id="btnToggleEdit" title="Activar/Desactivar edición manual">
+                    <button class="nav-btn btn-excel" id="btnToggleEdit" title="Activar/Desactivar edición manual" data-active="false">
                         <span class="btn-text">✏️ Modo Edición</span>
                         <span class="btn-icon">✏️</span>
                     </button>

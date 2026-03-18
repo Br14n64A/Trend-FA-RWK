@@ -313,7 +313,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (pass === 'admin123') { // Cambia esto por tu clave deseada
                     isEditMode = true;
                     btnToggleEdit.classList.add('active');
-                    btnToggleEdit.innerHTML = '✅ Guardar Cambios';
+                    // Preserve btn-text and btn-icon spans for mobile compatibility
+                    const btnTextSpan = btnToggleEdit.querySelector('.btn-text');
+                    const btnIconSpan = btnToggleEdit.querySelector('.btn-icon');
+                    if (btnTextSpan) btnTextSpan.textContent = '✅ Guardar Cambios';
+                    if (btnIconSpan) btnIconSpan.textContent = '✅';
                     renderSummaryTable();
                     updateStatus('Modo Edición ACTIVADO', 'info');
                 } else {
@@ -322,7 +326,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 isEditMode = false;
                 btnToggleEdit.classList.remove('active');
-                btnToggleEdit.innerHTML = '✏️ Modo Edición';
+                // Preserve btn-text and btn-icon spans for mobile compatibility
+                const btnTextSpan = btnToggleEdit.querySelector('.btn-text');
+                const btnIconSpan = btnToggleEdit.querySelector('.btn-icon');
+                if (btnTextSpan) btnTextSpan.textContent = '✏️ Modo Edición';
+                if (btnIconSpan) btnIconSpan.textContent = '✏️';
                 renderSummaryTable();
                 updateStatus('Cambios guardados', 'success');
             }
@@ -941,11 +949,9 @@ async function updateAccumulatedData(fileIdentifier) {
     const stored = window.dashboard_storage;
     if (!stored) return;
 
-    // Verificar si este archivo ya fue procesado para no sumarlo dos veces
-    if (stored.processedFiles && stored.processedFiles.includes(fileIdentifier)) {
-        console.log("Archivo ya procesado previamente. No se sumarán los datos al histórico para evitar duplicados.");
-        return;
-    }
+    // NOTA: Ya no bloqueamos por fileIdentifier porque ahora REEMPLAZAMOS los datos del día
+    // en lugar de sumarlos. Subir el archivo varias veces en el mismo día siempre dará el mismo resultado.
+    console.log(`Procesando archivo: ${fileIdentifier}`);
 
     const now = new Date();
     let currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -996,9 +1002,9 @@ async function updateAccumulatedData(fileIdentifier) {
     });
 
     CATEGORIES.forEach(cat => {
-        // En lugar de sobrescribir, sumamos a lo que ya hay para ese día
-        const existingData = stored.data[cat][todayName] || 0;
-        stored.data[cat][todayName] = existingData + currentCounts[cat];
+        // REEMPLAZAR el valor del día actual en lugar de sumar
+        // Esto garantiza que cada subida del archivo del día refleja el estado actual
+        stored.data[cat][todayName] = currentCounts[cat];
     });
 
     // Registrar archivo como procesado
@@ -1845,7 +1851,8 @@ async function exportToPPT() {
     }
 
     if (typeof PptxGenJS === 'undefined') {
-        updateStatus('Error: PptxGenJS no está cargado', 'error');
+        updateStatus('Error: PptxGenJS no está cargado. Asegúrese de que pptxgen.bundle.js está en la carpeta del proyecto.', 'error');
+        alert('Error: La librería PptxGenJS no está disponible. Asegúrese de que el archivo pptxgen.bundle.js esté en la carpeta del proyecto.');
         return;
     }
 
@@ -1860,8 +1867,10 @@ async function exportToPPT() {
         const wasHidden = chartsView && chartsView.classList.contains('hidden');
         if (wasHidden) {
             chartsView.classList.remove('hidden');
-            // Force a small delay or sync resize if needed
+            // Force chart resize
             Object.values(charts).forEach(c => { if (c) c.resize(); });
+            // Wait for browser to actually render the charts before capturing
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         // Custom Colors
@@ -1881,6 +1890,12 @@ async function exportToPPT() {
         slide1.addText(`Resumen Semanal: ${stored.weekId}`, {
             x: 1, y: 3.5, w: '80%', h: 1,
             fontSize: 24, color: darkText,
+            align: 'center'
+        });
+        const dateNow = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        slide1.addText(`Generado: ${dateNow}`, {
+            x: 1, y: 4.5, w: '80%', h: 0.5,
+            fontSize: 14, color: '475569',
             align: 'center'
         });
 
@@ -1910,7 +1925,7 @@ async function exportToPPT() {
             const prevVal = (typeof prevFridayRaw === 'object') ? (prevFridayRaw.count || 0) : prevFridayRaw;
 
             let hasData = prevVal > 0;
-            WEEK_DAYS.forEach(d => { if ((stored.data[cat][d] || 0) > 0) hasData = true; });
+            WEEK_DAYS.forEach(d => { if ((stored.data[cat] && stored.data[cat][d] || 0) > 0) hasData = true; });
             if (!hasData) return;
 
             grandPrevTotal += prevVal;
@@ -1918,17 +1933,17 @@ async function exportToPPT() {
 
             const rowData = [
                 { text: cat, options: { fill: 'e2e8f0', color: '1e293b' } },
-                { text: prevVal, options: { fill: getPptTrendColor(prevTrend), color: getPptTrendFontColor(prevTrend), bold: true } }
+                { text: String(prevVal), options: { fill: getPptTrendColor(prevTrend), color: getPptTrendFontColor(prevTrend), bold: true } }
             ];
 
             let currentLastVal = prevVal;
 
             WEEK_DAYS.forEach(d => {
-                const val = stored.data[cat][d] || 0;
+                const val = (stored.data[cat] && stored.data[cat][d]) || 0;
                 const trend = getTrendClass(val, currentLastVal);
-                rowData.push({ text: val, options: { fill: getPptTrendColor(trend), color: getPptTrendFontColor(trend), bold: true } });
+                rowData.push({ text: String(val), options: { fill: getPptTrendColor(trend), color: getPptTrendFontColor(trend), bold: true } });
                 totalsByDay[d] += val;
-                currentLastVal = val;
+                if (val > 0) currentLastVal = val;
             });
 
             tableData.push(rowData);
@@ -1937,15 +1952,19 @@ async function exportToPPT() {
         // Total Row
         tableData.push([
             { text: 'TOTAL', options: { bold: true, fill: 'cbd5e1' } },
-            { text: grandPrevTotal, options: { bold: true, fill: 'cbd5e1' } },
-            ...WEEK_DAYS.map(d => ({ text: totalsByDay[d], options: { bold: true, fill: 'cbd5e1' } }))
+            { text: String(grandPrevTotal), options: { bold: true, fill: 'cbd5e1' } },
+            ...WEEK_DAYS.map(d => ({ text: String(totalsByDay[d]), options: { bold: true, fill: 'cbd5e1' } }))
         ]);
 
-        slide2.addTable(tableData, {
-            x: 0.5, y: 1.2, w: 9,
-            border: { type: 'solid', color: 'cbd5e1', pt: 1 },
-            align: 'center', valign: 'middle', fontSize: 12
-        });
+        if (tableData.length > 1) {
+            slide2.addTable(tableData, {
+                x: 0.5, y: 1.2, w: 9,
+                border: { type: 'solid', color: 'cbd5e1', pt: 1 },
+                align: 'center', valign: 'middle', fontSize: 12
+            });
+        } else {
+            slide2.addText('No hay datos de resumen semanal', { x: 0.5, y: 2, w: '90%', fontSize: 16, color: '94a3b8' });
+        }
 
         // --- SLIDE 3: CHARTS (Entradas y Salidas) ---
         let slide3 = pres.addSlide();
@@ -1955,15 +1974,19 @@ async function exportToPPT() {
         });
 
         const entradasCanvas = document.getElementById('entradasChart');
-        if (entradasCanvas) {
+        if (entradasCanvas && entradasCanvas.width > 0) {
             slide3.addText('Entradas', { x: 0.5, y: 1.2, w: 4, h: 0.3, bold: true, fontSize: 14 });
             slide3.addImage({ data: entradasCanvas.toDataURL('image/png'), x: 0.5, y: 1.5, w: 4.2, h: 3.5 });
+        } else {
+            slide3.addText('No hay datos de Entradas', { x: 0.5, y: 2, w: 4, fontSize: 14, color: '94a3b8' });
         }
 
         const salidasCanvas = document.getElementById('salidasChart');
-        if (salidasCanvas) {
+        if (salidasCanvas && salidasCanvas.width > 0) {
             slide3.addText('Salidas', { x: 5, y: 1.2, w: 4, h: 0.3, bold: true, fontSize: 14 });
             slide3.addImage({ data: salidasCanvas.toDataURL('image/png'), x: 5, y: 1.5, w: 4.2, h: 3.5 });
+        } else {
+            slide3.addText('No hay datos de Salidas', { x: 5, y: 2, w: 4, fontSize: 14, color: '94a3b8' });
         }
 
         // --- SLIDE 4: CHART (FIRST) ---
@@ -1974,8 +1997,10 @@ async function exportToPPT() {
         });
 
         const firstCanvas = document.getElementById('firstChart');
-        if (firstCanvas) {
+        if (firstCanvas && firstCanvas.width > 0) {
             slide4.addImage({ data: firstCanvas.toDataURL('image/png'), x: 0.5, y: 1.2, w: 9, h: 4 });
+        } else {
+            slide4.addText('No hay datos de FIRST', { x: 0.5, y: 2, w: '90%', fontSize: 16, color: '94a3b8' });
         }
 
         // --- SLIDE 5: CHART (Alto Aging) ---
@@ -1986,10 +2011,10 @@ async function exportToPPT() {
         });
 
         const altoAgingCanvas = document.getElementById('altoAgingChart');
-        if (altoAgingCanvas) {
+        if (altoAgingCanvas && altoAgingCanvas.width > 0) {
             slide5aa.addImage({ data: altoAgingCanvas.toDataURL('image/png'), x: 0.5, y: 1.2, w: 9, h: 4.5 });
         } else {
-            slide5aa.addText('No hay datos de Alto Aging', { x: 0.5, y: 2, w: '90%', fontSize: 16 });
+            slide5aa.addText('No hay datos de Alto Aging', { x: 0.5, y: 2, w: '90%', fontSize: 16, color: '94a3b8' });
         }
 
         // --- SLIDE 6: GOLES ---
@@ -2025,10 +2050,14 @@ async function exportToPPT() {
                     chunk.forEach(g => {
                         const total = g.rwk + g.wip + g.pass;
                         slideTable.push([
-                            g.description, g.date,
-                            g.rwk, { text: `${((g.rwk / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.max(0, 140 - ((g.rwk / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } },
-                            g.wip, { text: `${((g.wip / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.max(0, 140 - ((g.wip / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } },
-                            g.pass, { text: `${((g.pass / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.min(140, ((g.pass / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } }
+                            { text: String(g.description) }, 
+                            { text: String(g.date) },
+                            { text: String(g.rwk) }, 
+                            { text: `${((g.rwk / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.max(0, 140 - ((g.rwk / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } },
+                            { text: String(g.wip) }, 
+                            { text: `${((g.wip / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.max(0, 140 - ((g.wip / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } },
+                            { text: String(g.pass) }, 
+                            { text: `${((g.pass / total) * 100).toFixed(0)}%`, options: { fill: hslToHex(Math.min(140, ((g.pass / total) * 100 * 1.4)), 100, 70), color: '1e293b', bold: true } }
                         ]);
                     });
 
@@ -2060,7 +2089,7 @@ async function exportToPPT() {
 
     } catch (error) {
         console.error('PPT Export Error:', error);
-        updateStatus('Error al generar PowerPoint', 'error');
+        updateStatus('Error al generar PowerPoint: ' + error.message, 'error');
     }
 }
 
