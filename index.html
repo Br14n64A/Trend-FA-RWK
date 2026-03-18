@@ -49,9 +49,16 @@
             </nav>
 
             <div class="header-actions">
-                <button class="nav-btn btn-excel" id="btnToggleEdit" title="Activar/Desactivar edición manual">✏️ Modo Edición</button>
-                <button class="nav-btn btn-excel" id="btnExportPPT" title="Descargar reporte en PowerPoint">📽️
-                    Descargar PowerPoint</button>
+                <div class="actions-group">
+                    <button class="nav-btn btn-excel" id="btnToggleEdit" title="Activar/Desactivar edición manual">
+                        <span class="btn-text">✏️ Modo Edición</span>
+                        <span class="btn-icon">✏️</span>
+                    </button>
+                    <button class="nav-btn btn-excel" id="btnExportPPT" title="Descargar reporte en PowerPoint">
+                        <span class="btn-text">📽️ Descargar PowerPoint</span>
+                        <span class="btn-icon">📽️</span>
+                    </button>
+                </div>
 
                 <label for="fileUpload" class="upload-btn" title="Cargar Excel">
                     <span>📁</span>
@@ -59,8 +66,7 @@
                 </label>
                 <div class="file-status" id="fileStatus">
                     <span class="pulse"></span>
-                    <span id="statusText">Awaiting file...</span>
-
+                    <span id="statusText" class="status-text-mobile-hide">Awaiting file...</span>
                 </div>
             </div>
         </header>
@@ -148,6 +154,7 @@
                             <div class="card-header">
                                 <h2>Alto Aging por Modelo</h2>
                                 <div class="header-tags">
+                                    <button class="nav-btn btn-excel" id="btnDownloadAltoAging" title="Descargar datos originales de Alto Aging" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">⬇️ Descargar Datos</button>
                                     <span class="pill" id="altoAgingTotal">Total: 0</span>
                                 </div>
                             </div>

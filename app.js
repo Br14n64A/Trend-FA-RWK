@@ -299,6 +299,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnExportPPT = document.getElementById('btnExportPPT');
     if (btnExportPPT) btnExportPPT.addEventListener('click', exportToPPT);
 
+    const btnDownloadAltoAging = document.getElementById('btnDownloadAltoAging');
+    if (btnDownloadAltoAging) btnDownloadAltoAging.addEventListener('click', exportAltoAgingToExcel);
+
     // No export to excel button found in HTML, so we remove the listener to avoid errors
 
     const btnToggleEdit = document.getElementById('btnToggleEdit');
@@ -1389,7 +1392,80 @@ function processAltoAging(rows, mrbRows = []) {
         if (Object.keys(result[cat]).length === 0) delete result[cat];
     });
 
+    // Guardar los datos de origen para poder exportarlos después
+    if (window.dashboard_storage) {
+        window.dashboard_storage.altoAgingSourceData = rows;
+    }
+
     return result;
+}
+
+/**
+ * Downloads the source data lines related to Alto Aging as an Excel file.
+ */
+async function exportAltoAgingToExcel() {
+    const stored = window.dashboard_storage;
+    if (!stored || !stored.altoAgingSourceData || stored.altoAgingSourceData.length < 2) {
+        updateStatus('No hay datos fuente de Alto Aging para exportar', 'error');
+        return;
+    }
+
+    if (typeof ExcelJS === 'undefined') {
+        updateStatus('Error: ExcelJS no está cargado', 'error');
+        return;
+    }
+
+    updateStatus('Generando Excel de Alto Aging...', 'info');
+
+    try {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'PCBA Dashboard';
+        const sheet = workbook.addWorksheet('Alto Aging - Datos Originales');
+        
+        const sourceData = stored.altoAgingSourceData;
+        const headers = sourceData[0];
+        sheet.addRow(headers);
+        
+        // Estilar cabeceras
+        const headerRow = sheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+
+        // Filtrar y agregar solo filas que son FAIL y que caen en la lógica de Alto Aging
+        for (let i = 1; i < sourceData.length; i++) {
+            const row = sourceData[i];
+            const colD = String(row[3] || '').toUpperCase();
+            const colV = String(row[21] || '').trim();
+
+            if (!colD.includes('FAIL')) continue;
+            if (colV) continue;
+
+            const newRow = sheet.addRow(row);
+            newRow.alignment = { vertical: 'middle' };
+        }
+
+        sheet.columns.forEach(column => {
+            column.width = 15;
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.download = `Alto_Aging_Source_Data_${dateStr}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        updateStatus('Datos de Alto Aging descargados', 'success');
+    } catch (err) {
+        console.error('Alto Aging Export Error:', err);
+        updateStatus('Error al generar Excel (Alto Aging)', 'error');
+    }
 }
 
 /**

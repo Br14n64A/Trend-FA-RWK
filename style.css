@@ -138,6 +138,16 @@ header {
     color: var(--text-secondary);
 }
 
+.btn-icon {
+    display: none;
+}
+
+.actions-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
 /* View Management */
 .view-nav {
     display: flex;
@@ -739,6 +749,33 @@ tr:hover td {
         font-size: 0.7rem;
         justify-content: center;
         text-align: center;
+    }
+
+    .btn-text {
+        display: none;
+    }
+
+    .btn-icon {
+        display: inline-block;
+        font-size: 1.2rem;
+    }
+
+    .actions-group {
+        display: flex;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .status-text-mobile-hide {
+        display: none !important;
+    }
+    
+    .file-status {
+        padding: 0.5rem;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        justify-content: center;
     }
 
     .charts-grid {
