@@ -408,6 +408,19 @@ async function loadStateFromServer() {
 async function saveStateToServer() {
     if (!window.dashboard_storage) return;
 
+    // Guardar altoAgingSourceData y mrbSourceData en una clave SEPARADA de localStorage
+    // para que sobrevivan el refresco sin saturar el payload del servidor.
+    try {
+        if (window.dashboard_storage.altoAgingSourceData) {
+            localStorage.setItem('dashboard_alto_aging_source', JSON.stringify(window.dashboard_storage.altoAgingSourceData));
+        }
+        if (window.dashboard_storage.mrbSourceData) {
+            localStorage.setItem('dashboard_mrb_source', JSON.stringify(window.dashboard_storage.mrbSourceData));
+        }
+    } catch(e) {
+        console.warn('No se pudo guardar datos de Alto Aging en localStorage:', e);
+    }
+
     // Crear una copia de los datos para guardar, sin incluir
     // la data original "cruda" del excel (sourceData) que es muy pesada
     // y causa Error HTTP 413 (Payload Too Large) en el servidor php.
@@ -499,6 +512,21 @@ function switchView(viewId) {
 function restoreState() {
     const stored = window.dashboard_storage;
     if (!stored || !stored.data) return;
+
+    // Intentar restaurar los datos de Alto Aging source desde su clave separada en localStorage
+    try {
+        const savedAltoAgingSource = localStorage.getItem('dashboard_alto_aging_source');
+        const savedMrbSource = localStorage.getItem('dashboard_mrb_source');
+        if (savedAltoAgingSource && !stored.altoAgingSourceData) {
+            stored.altoAgingSourceData = JSON.parse(savedAltoAgingSource);
+            console.log('Datos de Alto Aging source restaurados desde localStorage.');
+        }
+        if (savedMrbSource && !stored.mrbSourceData) {
+            stored.mrbSourceData = JSON.parse(savedMrbSource);
+        }
+    } catch(e) {
+        console.warn('No se pudieron restaurar datos de Alto Aging source:', e);
+    }
 
     // Restore Summary Table
     renderSummaryTable();
@@ -666,6 +694,12 @@ function handleFileUpload(e) {
                 rawData = statusRows.slice(1);
                 processData();
                 await updateAccumulatedData(fileIdentifier); // Made async and awaited
+                // Mostrar mensaje informativo al usuario
+                const failCount = filteredData.length;
+                const now2 = new Date();
+                const dayIdx = now2.getDay() === 0 ? 0 : (now2.getDay() === 6 ? 0 : now2.getDay() - 1);
+                const dayName = WEEK_DAYS[Math.min(dayIdx, WEEK_DAYS.length - 1)];
+                updateStatus(`✓ ${failCount} registros FAIL actualizados en ${dayName}`, failCount > 0 ? 'success' : 'info');
             }
 
             // 2. Entradas
@@ -733,7 +767,9 @@ function handleFileUpload(e) {
             stored.altoAgingData = altoAgingData;
             saveStateToServer();
 
-            updateStatus('File processed successfully', 'success');
+            // Mostrar mensaje de éxito general después de un breve retraso
+            // para no sobreescribir el mensaje de conteo de registros FAIL
+            setTimeout(() => updateStatus('Archivo procesado correctamente', 'success'), 2000);
         } catch (error) {
             console.error('Error processing Excel:', error);
             updateStatus('Error processing file.', 'error');
@@ -937,12 +973,13 @@ function processData() {
         return passesModel && passesWO;
     });
 
-    // Persist Stats
+    // Solo actualizar stats en memoria — NO guardar aquí para evitar race condition
+    // con updateAccumulatedData que se llama justo después y necesita guardar primero.
     let stored = window.dashboard_storage;
     if (stored) {
         stored.stats = { total: rawData.length, filtered: filteredData.length };
-        saveStateToServer();
     }
+    console.log(`[processData] Total filas: ${rawData.length}, FAIL filtradas: ${filteredData.length}`);
 }
 
 async function updateAccumulatedData(fileIdentifier) {
@@ -990,7 +1027,6 @@ async function updateAccumulatedData(fileIdentifier) {
     const todayName = WEEK_DAYS[targetDayIndex];
 
     const currentCounts = {};
-
     CATEGORIES.forEach(cat => currentCounts[cat] = 0);
 
     filteredData.forEach(row => {
@@ -1001,19 +1037,35 @@ async function updateAccumulatedData(fileIdentifier) {
         }
     });
 
+    // Log para diagnóstico
+    console.log(`[updateAccumulatedData] Día: ${todayName}, Conteos por categoría:`, JSON.stringify(currentCounts));
+
     CATEGORIES.forEach(cat => {
+        // Asegurar que stored.data[cat] existe antes de escribir
+        if (!stored.data[cat]) {
+            stored.data[cat] = {};
+            WEEK_DAYS.forEach(d => stored.data[cat][d] = 0);
+        }
         // REEMPLAZAR el valor del día actual en lugar de sumar
         // Esto garantiza que cada subida del archivo del día refleja el estado actual
         stored.data[cat][todayName] = currentCounts[cat];
     });
 
-    // Registrar archivo como procesado
+    // Registrar archivo como procesado (solo para registro, ya no bloquea)
     if (!stored.processedFiles) stored.processedFiles = [];
     stored.processedFiles.push(fileIdentifier);
-    // Mantener la lista pequeña
     if (stored.processedFiles.length > 50) stored.processedFiles.shift();
 
+    // Guardar todo incluyendo stats (que se omitió en processData para evitar race condition)
+    if (stored.stats === undefined) {
+        stored.stats = { total: rawData.length, filtered: filteredData.length };
+    }
+
     await saveStateToServer();
+
+    // Re-renderizar la tabla inmediatamente después de guardar para reflejar los nuevos datos
+    renderSummaryTable();
+    console.log(`[updateAccumulatedData] Datos guardados y tabla actualizada para ${todayName}.`);
 }
 
 
