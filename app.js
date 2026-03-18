@@ -407,11 +407,14 @@ async function saveStateToServer() {
     // Save to server if on HTTP
     if (window.location.protocol.startsWith('http')) {
         try {
-            await fetch('data_handler.php', {
+            const response = await fetch('data_handler.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(window.dashboard_storage)
             });
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
             updateStatus('Sincronizado', 'success');
         } catch (e) {
             console.error("Error saving to server:", e);
@@ -605,6 +608,12 @@ async function checkWeeklyReset() {
 
 function handleFileUpload(e) {
     const file = e.target.files[0];
+    
+    // Clear the input so that selecting the same file again triggers the event
+    if (e.target) {
+        e.target.value = '';
+    }
+
     if (!file) return;
 
     updateStatus(`Reading ${file.name}...`);
