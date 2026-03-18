@@ -261,6 +261,7 @@ let charts = {
     entradas: null,
     salidas: null,
     first: null,
+    second: null,
     altoAging: null
 };
 
@@ -536,6 +537,10 @@ function restoreState() {
         renderDashboard(stored.entradasData || [], stored.salidasData || [], stored.firstData || []);
     }
 
+    if (stored.secondData && stored.secondData.length > 0) {
+        renderSecondChart('secondChart', stored.secondData);
+    }
+
     if (stored.altoAgingData && Object.keys(stored.altoAgingData).length > 0) {
         renderAltoAgingChart(stored.altoAgingData);
     }
@@ -726,6 +731,21 @@ function handleFileUpload(e) {
                 firstData = processFirst(rows);
             }
 
+            // 5. SECOND
+            let secondSheetName = workbook.SheetNames.find(n => n.trim().toUpperCase() === 'SECOND');
+            if (!secondSheetName) {
+                secondSheetName = workbook.SheetNames.find(n => n.trim().toUpperCase().includes('SECOND')) || workbook.SheetNames[5];
+            }
+            const secondSheet = secondSheetName ? workbook.Sheets[secondSheetName] : null;
+            let secondData = [];
+            if (secondSheet) {
+                const rows = XLSX.utils.sheet_to_json(secondSheet, { header: 1 });
+                secondData = processSecond(rows);
+                renderSecondChart('secondChart', secondData);
+            } else {
+                console.warn('[SECOND] Hoja SECOND no encontrada en el archivo Excel.');
+            }
+
             // 6. GOLES (Search by name "GOLES" or index 4)
             let golesSheetName = workbook.SheetNames.find(n => n.trim().toUpperCase() === "GOLES");
 
@@ -763,6 +783,7 @@ function handleFileUpload(e) {
             stored.entradasData = entradasData;
             stored.salidasData = salidasData;
             stored.firstData = firstData;
+            stored.secondData = secondData;
             stored.golesData = golesData;
             stored.altoAgingData = altoAgingData;
             saveStateToServer();
@@ -816,6 +837,14 @@ function processSalidas(rows) {
         }
     });
     return unique;
+}
+
+function processSecond(rows) {
+    if (rows.length < 2) return [];
+    // Return unique rows by a identifier if needed, or just all rows. 
+    // In FIRST it uses Column D as a unique serial. Let's see if SECOND has a unique serial.
+    // Given the request, we'll just return the data rows.
+    return rows.slice(1);
 }
 
 function processFirst(rows) {
@@ -1077,6 +1106,8 @@ function renderDashboard(entradasData, salidasData, firstData) {
     if (salidasData) renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal");
     
     if (firstData) renderFirstChart("firstChart", firstData);
+
+    // Restore secondData if available (renderDashboard doesn't receive it, restoreState handles it)
 }
 
 function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, totalElementId) {
@@ -1335,7 +1366,7 @@ function renderFirstTable(counts, colors, sortedModels) {
         html += `
             <tr>
                 <td style="font-weight: 600;">${comp}</td>
-                <td>${badgesHtml}</td>
+                <td style="white-space: normal; line-height: 1.5;">${badgesHtml}</td>
                 <td style="font-weight: bold; color: var(--accent-primary); text-align: center;">${total}</td>
             </tr>
         `;
@@ -1345,6 +1376,175 @@ function renderFirstTable(counts, colors, sortedModels) {
         html = '<tr><td colspan="3" style="text-align: center; color: #94a3b8;">No hay componentes con múltiples fallas.</td></tr>';
     }
 
+    tbody.innerHTML = html;
+}
+
+function renderSecondChart(canvasId, data) {
+    // Column D (index 3) is Component, Column B (index 1) is Model, Column C (index 2) is Details
+    const componentModelCounts = {};
+    const components = new Set();
+    const models = new Set();
+    const componentCDetails = {}; 
+    let grandTotal = 0;
+
+    data.forEach(row => {
+        const component = String(row[3] || 'Unknown').trim();
+        const rawModel = String(row[1] || 'Unknown').trim();
+        const model = getCategory(rawModel);
+        const colC = String(row[2] || 'N/A').trim();
+
+        if (model !== "OTHER" && component !== '' && component.toUpperCase() !== 'N/A') {
+            components.add(component);
+            models.add(model);
+
+            if (!componentModelCounts[component]) componentModelCounts[component] = {};
+            componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
+
+            // Track Column C details per component and model
+            if (colC && colC.toUpperCase() !== 'N/A') {
+                if (!componentCDetails[component]) componentCDetails[component] = {};
+                if (!componentCDetails[component][model]) componentCDetails[component][model] = {};
+                componentCDetails[component][model][colC] = (componentCDetails[component][model][colC] || 0) + 1;
+            }
+
+            grandTotal++;
+        }
+    });
+
+    // Update grand total in UI
+    const totalEl = document.getElementById('secondTotal');
+    if (totalEl) totalEl.textContent = `Total: ${grandTotal}`;
+
+    const sortedComponents = Array.from(components).sort((a, b) => {
+        const totalA = Object.values(componentModelCounts[a]).reduce((s, v) => s + v, 0);
+        const totalB = Object.values(componentModelCounts[b]).reduce((s, v) => s + v, 0);
+        return totalB - totalA;
+    }).slice(0, 15); // Top 15
+
+    const sortedModels = Array.from(models).sort();
+    const colors = ['#f472b6', '#34d399', '#38bdf8', '#fbbf24', '#818cf8', '#a78bfa'];
+
+    const datasets = sortedModels.map((model, i) => ({
+        label: model,
+        data: sortedComponents.map(comp => componentModelCounts[comp][model] || 0),
+        backgroundColor: colors[i % colors.length],
+        borderRadius: 4,
+        barPercentage: 0.6,
+        categoryPercentage: 0.7
+    }));
+
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (charts.second) charts.second.destroy();
+
+    charts.second = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sortedComponents,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 40 } },
+            scales: {
+                x: { stacked: true, grid: { display: false }, ticks: { color: '#475569' } },
+                y: { stacked: true, beginAtZero: true, grace: '25%', grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { color: '#475569', precision: 0 } }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: '#475569', font: { size: 10, family: 'Outfit' } }
+                },
+                tooltip: {
+                    callbacks: {
+                        afterBody: (context) => {
+                            const component = context[0].label;
+                            const model = context[0].dataset.label;
+                            const hEntries = (componentCDetails[component] || {})[model] || {};
+                            
+                            const lines = [];
+                            if (Object.keys(hEntries).length > 0) {
+                                lines.push("Fallas:");
+                                Object.entries(hEntries).forEach(([val, count]) => {
+                                    lines.push(` • ${val}: ${count}`);
+                                });
+                            }
+                            return lines;
+                        }
+                    }
+                }
+            },
+        },
+        plugins: [{
+            id: 'stackedTopLabelsPluginSecond',
+            afterDraw: (chart) => {
+                const ctx = chart.ctx;
+                ctx.font = 'bold 13px Outfit';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillStyle = '#000000';
+
+                sortedComponents.forEach((comp, index) => {
+                    const total = Object.values(componentModelCounts[comp]).reduce((s, v) => s + v, 0);
+                    let highestY = chart.scales.y.bottom;
+                    let posX = 0;
+                    let found = false;
+
+                    for (let i = chart.data.datasets.length - 1; i >= 0; i--) {
+                        const m = chart.getDatasetMeta(i);
+                        if (m.data[index] && !m.hidden && m.data[index].y) {
+                            if (m.data[index].y < highestY) {
+                                highestY = m.data[index].y;
+                                posX = m.data[index].x;
+                                found = true;
+                            }
+                        }
+                    }
+                    if (total > 0 && found) {
+                        ctx.fillText(total, posX, highestY - 10);
+                    }
+                });
+            }
+        }]
+    });
+
+    renderSecondTable(componentModelCounts, colors, sortedModels);
+}
+
+function renderSecondTable(counts, colors, sortedModels) {
+    const tbody = document.getElementById('secondTableBody');
+    if (!tbody) return;
+
+    let html = '';
+    const sortedComps = Object.keys(counts).sort((a, b) => {
+        const totalA = Object.values(counts[a]).reduce((sum, val) => sum + val, 0);
+        const totalB = Object.values(counts[b]).reduce((sum, val) => sum + val, 0);
+        return totalB - totalA;
+    });
+
+    sortedComps.forEach(comp => {
+        const total = Object.values(counts[comp]).reduce((sum, val) => sum + val, 0);
+        if (total <= 1) return;
+
+        let badgesHtml = '';
+        sortedModels.forEach((model, i) => {
+            const count = counts[comp][model] || 0;
+            if (count > 0) {
+                const color = colors[i % colors.length];
+                badgesHtml += `<span style="background-color: ${color}; color: #1e293b; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-right: 4px; display: inline-block; margin-bottom: 2px;">${model}: ${count}</span>`;
+            }
+        });
+
+        html += `
+            <tr>
+                <td style="font-weight: 600;">${comp}</td>
+                <td style="white-space: normal; line-height: 1.5;">${badgesHtml}</td>
+                <td style="font-weight: bold; color: var(--accent-primary); text-align: center;">${total}</td>
+            </tr>
+        `;
+    });
+
+    if (!html) html = '<tr><td colspan="3" style="text-align: center; color: #94a3b8;">No hay componentes críticos en SECOND.</td></tr>';
     tbody.innerHTML = html;
 }
 
@@ -2055,21 +2255,35 @@ async function exportToPPT() {
             slide4.addText('No hay datos de FIRST', { x: 0.5, y: 2, w: '90%', fontSize: 16, color: '94a3b8' });
         }
 
-        // --- SLIDE 5: CHART (Alto Aging) ---
-        let slide5aa = pres.addSlide();
-        slide5aa.addText('Alto Aging por Modelo', {
+        // --- SLIDE 5: CHART (SECOND) ---
+        let slide5s = pres.addSlide();
+        slide5s.addText('SECOND Failure (Fallas por Componente)', {
+            x: 0.5, y: 0.5, w: '90%', h: 0.5,
+            fontSize: 24, bold: true, color: brandColor
+        });
+
+        const secondCanvas = document.getElementById('secondChart');
+        if (secondCanvas && secondCanvas.width > 0) {
+            slide5s.addImage({ data: secondCanvas.toDataURL('image/png'), x: 0.5, y: 1.2, w: 9, h: 4 });
+        } else {
+            slide5s.addText('No hay datos de SECOND', { x: 0.5, y: 2, w: '90%', fontSize: 16, color: '94a3b8' });
+        }
+
+        // --- SLIDE 6: CHART (Alto Aging) ---
+        let slide6aa = pres.addSlide();
+        slide6aa.addText('Alto Aging por Modelo', {
             x: 0.5, y: 0.5, w: '90%', h: 0.5,
             fontSize: 24, bold: true, color: brandColor
         });
 
         const altoAgingCanvas = document.getElementById('altoAgingChart');
         if (altoAgingCanvas && altoAgingCanvas.width > 0) {
-            slide5aa.addImage({ data: altoAgingCanvas.toDataURL('image/png'), x: 0.5, y: 1.2, w: 9, h: 4.5 });
+            slide6aa.addImage({ data: altoAgingCanvas.toDataURL('image/png'), x: 0.5, y: 1.2, w: 9, h: 4.5 });
         } else {
-            slide5aa.addText('No hay datos de Alto Aging', { x: 0.5, y: 2, w: '90%', fontSize: 16, color: '94a3b8' });
+            slide6aa.addText('No hay datos de Alto Aging', { x: 0.5, y: 2, w: '90%', fontSize: 16, color: '94a3b8' });
         }
 
-        // --- SLIDE 6: GOLES ---
+        // --- SLIDE 7: GOLES ---
         if (stored.golesData && stored.golesData.length > 0) {
             const golesHeaders = [
                 { text: 'Descripción', options: { fill: '94a3b8', bold: true, color: 'ffffff' } },
