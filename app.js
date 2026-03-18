@@ -400,9 +400,16 @@ async function loadStateFromServer() {
 async function saveStateToServer() {
     if (!window.dashboard_storage) return;
 
+    // Crear una copia de los datos para guardar, sin incluir
+    // la data original "cruda" del excel (sourceData) que es muy pesada
+    // y causa Error HTTP 413 (Payload Too Large) en el servidor php.
+    const dataToSave = { ...window.dashboard_storage };
+    delete dataToSave.altoAgingSourceData;
+    delete dataToSave.mrbSourceData;
+
     // Always save locally
     try {
-        localStorage.setItem('dashboard_storage', JSON.stringify(window.dashboard_storage));
+        localStorage.setItem('dashboard_storage', JSON.stringify(dataToSave));
     } catch (e) {
         console.error("Error saving local data:", e);
     }
@@ -413,7 +420,7 @@ async function saveStateToServer() {
             const response = await fetch('data_handler.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(window.dashboard_storage)
+                body: JSON.stringify(dataToSave)
             });
             if (!response.ok) {
                 throw new Error(`Error HTTP: ${response.status}`);
