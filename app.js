@@ -247,9 +247,9 @@ function isHoliday(date = new Date()) {
 
 
 const CONFIG = {
-    colModelIndex: 2, // Column C (0-indexed)
-    colWorkOrderIndex: 3, // Column D (0-indexed)
-    colErrorCodeIndex: 12 // Column M (0-indexed)
+    colModelIndex: 12,       // Column M (0-indexed) — ASSY PN / Número de parte
+    colWorkOrderIndex: 3,    // Column D (0-indexed) — Work Order / Status (filtramos por "FAIL")
+    colErrorCodeIndex: 12    // Column M (0-indexed)
 };
 
 let rawData = [];
