@@ -859,3 +859,62 @@ tr:hover td {
         border-radius: 12px;
     }
 }
+
+/* Visitor Log Styles */
+.visitor-log-section {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 2px dashed var(--glass-border);
+}
+
+.visitor-table {
+    width: 100%;
+    margin-top: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.visitor-table th {
+    background: #1e293b;
+    color: #f8fafc;
+    font-size: 0.75rem;
+}
+
+.visitor-table td {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.visitor-table tr:nth-child(even) td {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.visitor-stats-summary {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 3.5rem;
+    width: 100%;
+}
+
+.v-stat {
+    background: var(--card-bg);
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    flex: 1;
+    text-align: center;
+}
+
+.v-stat-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.v-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+}

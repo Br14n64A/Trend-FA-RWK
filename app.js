@@ -286,6 +286,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initial load from server
     await loadStateFromServer();
 
+    // Track visit (anonymous)
+    trackVisit();
+
     // Navigation Listeners
     const btnSummary = document.getElementById('btnSummary');
     const btnDashboard = document.getElementById('btnDashboard');
@@ -2079,6 +2082,9 @@ function renderHistory() {
     });
 
     container.innerHTML = html;
+    
+    // Also render visitor log
+    renderVisitorLog();
 }
 
 function getMappedName(rawVal) {
@@ -2621,6 +2627,83 @@ function getCountsForExport(data, colIndex) {
 
     return counts;
 }
+/**
+ * Records an anonymous visit to the server
+ */
+async function trackVisit() {
+    // Only track if running over HTTP
+    if (!window.location.protocol.startsWith('http')) return;
 
+    // Check if we already tracked this session to avoid flooding
+    const SESSION_KEY = 'visit_tracked_' + new Date().toISOString().split('T')[0]; // One track per day
+    if (localStorage.getItem(SESSION_KEY)) return;
 
+    // Get or create a unique visitor ID
+    let visitorId = localStorage.getItem('visitor_id');
+    if (!visitorId) {
+        visitorId = 'visitor_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+        localStorage.setItem('visitor_id', visitorId);
+    }
 
+    try {
+        const response = await fetch('track_visit.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ visitor_id: visitorId })
+        });
+        
+        if (response.ok) {
+            localStorage.setItem(SESSION_KEY, 'true');
+            console.log("Visit tracked successfully.");
+        }
+    } catch (e) {
+        console.warn("Failed to track visit:", e);
+    }
+}
+/**
+ * Fetches and renders the visitor logs
+ */
+async function renderVisitorLog() {
+    const tableBody = document.getElementById('visitorLogBody');
+    const totalEl = document.getElementById('vTotalVisits');
+    const uniqueEl = document.getElementById('vUniqueVisitors');
+    
+    if (!tableBody) return;
+
+    try {
+        const response = await fetch('track_visit.php');
+        const logs = await response.json();
+
+        if (!logs || logs.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem; color: #94a3b8;">No hay registros de visitas todavía.</td></tr>';
+            if (totalEl) totalEl.textContent = '0';
+            if (uniqueEl) uniqueEl.textContent = '0';
+            return;
+        }
+
+        // Summary Stats
+        const totalVisits = logs.length;
+        const uniqueVisitors = new Set(logs.map(l => l.visitor_id)).size;
+
+        if (totalEl) totalEl.textContent = totalVisits;
+        if (uniqueEl) uniqueEl.textContent = uniqueVisitors;
+
+        // Render Table (last 50 visits)
+        let html = "";
+        logs.reverse().slice(0, 50).forEach(entry => {
+            html += `
+                <tr>
+                    <td>${entry.timestamp || 'N/A'}</td>
+                    <td style="font-family: monospace;">${entry.ip || 'N/A'}</td>
+                    <td>${entry.hostname || 'N/A'}</td>
+                    <td title="${entry.visitor_id}" style="font-size: 0.7rem; color: #94a3b8;">${entry.visitor_id ? entry.visitor_id.substring(0, 12) + '...' : 'N/A'}</td>
+                </tr>
+            `;
+        });
+        tableBody.innerHTML = html;
+
+    } catch (e) {
+        console.error("Error loading visitor logs:", e);
+        tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 2rem; color: #ef4444;">Error al cargar registros.</td></tr>';
+    }
+}

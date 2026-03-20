@@ -253,6 +253,41 @@
                     <div id="historyContainer">
                         <!-- History cards will be rendered here -->
                     </div>
+
+                    <!-- Visitor Tracking Section -->
+                    <div class="visitor-log-section">
+                        <div class="card glass-panel" style="padding: 1.5rem;">
+                            <h3 style="margin-bottom: 1.5rem; color: #e11d48;">Estadísticas de Visitantes (Anónimo)</h3>
+                            
+                            <div class="visitor-stats-summary" id="visitorStatsSummary">
+                                <div class="v-stat">
+                                    <span class="v-stat-label">Total de Visitas</span>
+                                    <span class="v-stat-value" id="vTotalVisits">-</span>
+                                </div>
+                                <div class="v-stat">
+                                    <span class="v-stat-label">Visitantes Únicos</span>
+                                    <span class="v-stat-value" id="vUniqueVisitors">-</span>
+                                </div>
+                            </div>
+
+                            <div class="table-container">
+                                <table class="visitor-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha/Hora</th>
+                                            <th>IP</th>
+                                            <th>Nombre PC (Hostname)</th>
+                                            <th>ID Sesión</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="visitorLogBody">
+                                        <!-- Visitor logs will be rendered here -->
+                                        <tr><td colspan="4" style="text-align:center; padding: 2rem; color: #94a3b8;">Cargando registros...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </section>
             </div>
 
