@@ -818,10 +818,8 @@ function processEntradas(rows) {
     const seen = new Set();
     data.forEach(row => {
         const id = String(row[0] || '').trim();
-        const statusVal = String(row[8] || '').toUpperCase(); // Col I often has MISJUDGE
-        const isMisjudge = statusVal.includes("MISJUDGE") || statusVal.includes("N/A");
 
-        if (id && !isMisjudge && !seen.has(id)) {
+        if (id && !seen.has(id)) {
             seen.add(id);
             unique.push(row);
         }
