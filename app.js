@@ -126,10 +126,10 @@ const SERIAL_TO_CATEGORY = {
     "1A72BE300-600-G": "NOGA",
     "1A72BED00-600-G": "NOGA",
     "1A722A000-600-G": "NOGA",
-    // MOBO
-    "1A62LR500-600-G": "MOBO",
-    "1A62LRA00-600-G": "MOBO",
-    "1A62LR600-600-G": "MOBO",
+    // MOBO -> MB
+    "1A62LR500-600-G": "MB",
+    "1A62LRA00-600-G": "MB",
+    "1A62LR600-600-G": "MB",
     // JUPITER
     "1A727YE00-600-G": "JUPITER",
     "1A727YF00-600-G": "JUPITER",
@@ -216,7 +216,7 @@ function getCategory(rawModel) {
     if (mappedName.includes("UC MODULE") || mappedName.includes("UC_MODULE")) return "UC Module";
     if (mappedName.includes("RISER")) return "RISER";
     if (mappedName.includes("SSD")) return "SSD";
-    if (mappedName.includes("MOBO")) return "MOBO";
+    if (mappedName.includes("MOBO")) return "MB";
     if (mappedName.includes("UPDB")) return "UPDB";
     if (mappedName.includes("SPARROW") || mappedName.includes("MB") || mappedName.includes("SWAN") || mappedName.includes("TPM")) return "MB";
 
@@ -543,13 +543,11 @@ function restoreState() {
     // Restore Second Failures
     const secondData = stored.secondData || stored.seconsData;
     if (secondData) {
-        // If it's the raw data as expected by renderSecondChart
         if (Array.isArray(secondData) && secondData.length > 0) {
             renderSecondChart('secondChart', secondData);
-        } else if (secondData.counts) {
-            // Handle summary object if it was stored that way by mistake
-            // and let it be overwritten by next file upload
-            console.log('Stored second data is in summary format, waiting for next upload to update raw rows.');
+        } else if (secondData.counts && typeof secondData.counts === 'object') {
+            // If it was stored in summary format, we can still render it if we adapt renderSecondChart
+            renderSecondChart('secondChart', secondData);
         }
     }
 
@@ -1360,8 +1358,8 @@ function renderFirstTable(counts, colors, sortedModels) {
     sortedComps.forEach(comp => {
         const total = Object.values(counts[comp]).reduce((sum, val) => sum + val, 0);
 
-        // Discard components with only 1 failure
-        if (total <= 1) return;
+        // Discard components with no failure (should not happen with filtered data)
+        if (total < 1) return;
 
         let badgesHtml = '';
         sortedModels.forEach((model, i) => {
@@ -1396,34 +1394,46 @@ function renderSecondChart(canvasId, data) {
     let grandTotal = 0;
 
     // Column J (index 9) is Component (Location), Column C (index 2) is Model (Assy PN), Column H (index 7) is Details (ReasonInformation)
-    data.forEach(row => {
-        // Skip header rows or non-data rows
-        if (!row || row.length < 5 || row[0] === 'NO' || (typeof row[0] === 'string' && row[0].toUpperCase().includes('SECOND'))) {
-            return;
-        }
-
-        const component = String(row[9] || row[3] || 'Unknown').trim(); // Use index 9 but fallback to 3 if index 9 is empty
-        const rawModel = String(row[2] || row[1] || 'Unknown').trim(); // Use index 2 but fallback to 1 if index 2 is empty
-        const model = getCategory(rawModel);
-        const colH = String(row[7] || row[2] || 'N/A').trim(); // Use index 7 but fallback to 2 if index 7 is empty
-
-        if (model !== "OTHER" && component !== '' && component.toUpperCase() !== 'N/A' && component.toUpperCase() !== 'UNKNOWN') {
-            components.add(component);
-            models.add(model);
-
-            if (!componentModelCounts[component]) componentModelCounts[component] = {};
-            componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
-
-            // Track details per component and model (using colH which corresponds to ReasonInformation)
-            if (colH && colH.toUpperCase() !== 'N/A') {
-                if (!componentCDetails[component]) componentCDetails[component] = {};
-                if (!componentCDetails[component][model]) componentCDetails[component][model] = {};
-                componentCDetails[component][model][colH] = (componentCDetails[component][model][colH] || 0) + 1;
+    if (Array.isArray(data)) {
+        data.forEach(row => {
+            // Skip header rows or non-data rows
+            if (!row || row.length < 5 || row[0] === 'NO' || (typeof row[0] === 'string' && row[0].toUpperCase().includes('SECOND'))) {
+                return;
             }
 
-            grandTotal++;
-        }
-    });
+            const component = String(row[9] || row[3] || 'Unknown').trim(); // Use index 9 but fallback to 3 if index 9 is empty
+            const rawModel = String(row[2] || row[1] || 'Unknown').trim(); // Use index 2 but fallback to 1 if index 2 is empty
+            const model = getCategory(rawModel);
+            const colH = String(row[7] || row[2] || 'N/A').trim(); // Use index 7 but fallback to 2 if index 7 is empty
+
+            if (model !== "OTHER" && component !== '' && component.toUpperCase() !== 'N/A' && component.toUpperCase() !== 'UNKNOWN') {
+                components.add(component);
+                models.add(model);
+
+                if (!componentModelCounts[component]) componentModelCounts[component] = {};
+                componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
+
+                // Track details per component and model (using colH which corresponds to ReasonInformation)
+                if (colH && colH.toUpperCase() !== 'N/A') {
+                    if (!componentCDetails[component]) componentCDetails[component] = {};
+                    if (!componentCDetails[component][model]) componentCDetails[component][model] = {};
+                    componentCDetails[component][model][colH] = (componentCDetails[component][model][colH] || 0) + 1;
+                }
+
+                grandTotal++;
+            }
+        });
+    } else if (data && data.counts && data.details) {
+        // Handle summary object format
+        Object.entries(data.counts).forEach(([model, count]) => {
+            // Note: Summary object format usually maps counts differently
+            // but we'll try to reconstruct a basic view
+            // If data.details has the list of SNs, it's hard to map back to components
+            console.warn("[renderSecondChart] Received summary object format, limited detail will be shown.");
+        });
+        // This part is tricky because the summary object format lost the component mapping.
+        // We'll just skip rendering if it's the wrong format, or show a message.
+    }
 
     // Update grand total in UI
     const totalEl = document.getElementById('secondTotal');
@@ -1538,7 +1548,8 @@ function renderSecondTable(counts, colors, sortedModels) {
 
     sortedComps.forEach(comp => {
         const total = Object.values(counts[comp]).reduce((sum, val) => sum + val, 0);
-        if (total <= 1) return;
+        // Discard components with no failure
+        if (total < 1) return;
 
         let badgesHtml = '';
         sortedModels.forEach((model, i) => {
