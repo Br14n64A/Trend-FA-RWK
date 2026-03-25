@@ -717,8 +717,12 @@ function handleFileUpload(e) {
                 updateStatus(`✓ ${failCount} registros FAIL actualizados en ${dayName}`, failCount > 0 ? 'success' : 'info');
             }
 
-            // 2. Entradas
-            const entradasSheet = workbook.Sheets["Entradas"];
+            // 2. Entradas (Hoja 2)
+            let entradasSheetName = workbook.SheetNames.find(n => n.trim().toUpperCase() === 'ENTRADA' || n.trim().toUpperCase() === 'ENTRADAS');
+            if (!entradasSheetName && workbook.SheetNames.length > 1) {
+                entradasSheetName = workbook.SheetNames[1]; // Toma la hoja 2 explícitamente
+            }
+            const entradasSheet = entradasSheetName ? workbook.Sheets[entradasSheetName] : null;
             let entradasData = [];
             if (entradasSheet) {
                 const rows = XLSX.utils.sheet_to_json(entradasSheet, { header: 1 });
@@ -1105,24 +1109,26 @@ async function updateAccumulatedData(fileIdentifier) {
 
 function renderDashboard(entradasData, salidasData, firstData) {
     renderSummaryTable();
-    // Entradas: Model Serial is Column D (index 3)
-    if (entradasData) renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal");
+    // Entradas: Model Serial is Column D (index 3). Graph exact models using useRawModel = true
+    if (entradasData) renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal", true);
     // Salidas: Model Serial is Column C (index 2)
-    if (salidasData) renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal");
+    if (salidasData) renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal", false);
     
     if (firstData) renderFirstChart("firstChart", firstData);
 
     // Restore secondData if available (renderDashboard doesn't receive it, restoreState handles it)
 }
 
-function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, totalElementId) {
+function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, totalElementId, useRawModel = false) {
     const counts = {};
     let grandTotal = 0;
 
     data.forEach(row => {
         const rawModel = String(row[modelColIndex] || 'Unknown').trim();
-        const category = getCategory(rawModel);
-        if (category !== "OTHER") {
+        if (!rawModel || rawModel.toUpperCase() === 'MODEL' || rawModel.toUpperCase() === 'ASSY PN' || rawModel.toUpperCase() === 'N/A' || rawModel.toUpperCase() === 'UNKNOWN') return;
+
+        const category = useRawModel ? rawModel : getCategory(rawModel);
+        if (useRawModel || category !== "OTHER") {
             counts[category] = (counts[category] || 0) + 1;
             grandTotal++;
         }
