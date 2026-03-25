@@ -540,8 +540,17 @@ function restoreState() {
         renderDashboard(stored.entradasData || [], stored.salidasData || [], stored.firstData || []);
     }
 
-    if (stored.secondData && stored.secondData.length > 0) {
-        renderSecondChart('secondChart', stored.secondData);
+    // Restore Second Failures
+    const secondData = stored.secondData || stored.seconsData;
+    if (secondData) {
+        // If it's the raw data as expected by renderSecondChart
+        if (Array.isArray(secondData) && secondData.length > 0) {
+            renderSecondChart('secondChart', secondData);
+        } else if (secondData.counts) {
+            // Handle summary object if it was stored that way by mistake
+            // and let it be overwritten by next file upload
+            console.log('Stored second data is in summary format, waiting for next upload to update raw rows.');
+        }
     }
 
     if (stored.altoAgingData && Object.keys(stored.altoAgingData).length > 0) {
@@ -844,10 +853,7 @@ function processSalidas(rows) {
 
 function processSecond(rows) {
     if (rows.length < 2) return [];
-    // Return unique rows by a identifier if needed, or just all rows. 
-    // In FIRST it uses Column D as a unique serial. Let's see if SECOND has a unique serial.
-    // Given the request, we'll just return the data rows.
-    return rows.slice(1);
+    return rows; // Keep headers to allow concatenated structure handling in render
 }
 
 function processFirst(rows) {
@@ -1383,31 +1389,36 @@ function renderFirstTable(counts, colors, sortedModels) {
 }
 
 function renderSecondChart(canvasId, data) {
-    // Column D (index 3) is Component, Column B (index 1) is Model, Column C (index 2) is Details
     const componentModelCounts = {};
     const components = new Set();
     const models = new Set();
     const componentCDetails = {}; 
     let grandTotal = 0;
 
+    // Column J (index 9) is Component (Location), Column C (index 2) is Model (Assy PN), Column H (index 7) is Details (ReasonInformation)
     data.forEach(row => {
-        const component = String(row[3] || 'Unknown').trim();
-        const rawModel = String(row[1] || 'Unknown').trim();
-        const model = getCategory(rawModel);
-        const colC = String(row[2] || 'N/A').trim();
+        // Skip header rows or non-data rows
+        if (!row || row.length < 5 || row[0] === 'NO' || (typeof row[0] === 'string' && row[0].toUpperCase().includes('SECOND'))) {
+            return;
+        }
 
-        if (model !== "OTHER" && component !== '' && component.toUpperCase() !== 'N/A') {
+        const component = String(row[9] || row[3] || 'Unknown').trim(); // Use index 9 but fallback to 3 if index 9 is empty
+        const rawModel = String(row[2] || row[1] || 'Unknown').trim(); // Use index 2 but fallback to 1 if index 2 is empty
+        const model = getCategory(rawModel);
+        const colH = String(row[7] || row[2] || 'N/A').trim(); // Use index 7 but fallback to 2 if index 7 is empty
+
+        if (model !== "OTHER" && component !== '' && component.toUpperCase() !== 'N/A' && component.toUpperCase() !== 'UNKNOWN') {
             components.add(component);
             models.add(model);
 
             if (!componentModelCounts[component]) componentModelCounts[component] = {};
             componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
 
-            // Track Column C details per component and model
-            if (colC && colC.toUpperCase() !== 'N/A') {
+            // Track details per component and model (using colH which corresponds to ReasonInformation)
+            if (colH && colH.toUpperCase() !== 'N/A') {
                 if (!componentCDetails[component]) componentCDetails[component] = {};
                 if (!componentCDetails[component][model]) componentCDetails[component][model] = {};
-                componentCDetails[component][model][colC] = (componentCDetails[component][model][colC] || 0) + 1;
+                componentCDetails[component][model][colH] = (componentCDetails[component][model][colH] || 0) + 1;
             }
 
             grandTotal++;
