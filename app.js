@@ -1627,21 +1627,19 @@ function renderSecondTable(sortedModels, modelCounts, modelFailures) {
         const failureEntries = Object.entries(fallas).sort((a, b) => b[1] - a[1]);
         
         failureEntries.forEach(([falla, cnt], idx) => {
-            // Generar un color suave para cada falla (azul-teal-índigo)
-            const fHue = (190 + idx * 20) % 360;
+            // Colores tomados de una paleta suave variada como en FIRST
+            const fHue = (190 + idx * 45) % 360;
             const fColor = `hsl(${fHue}, 70%, 85%)`; 
             
-            failBadges += `<span style="background-color: ${fColor}; color: #1e293b; padding: 2px 7px; border-radius: 5px; font-size: 0.72rem; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${falla}: ${cnt}</span>`;
+            failBadges += `<span style="background-color: ${fColor}; color: #1e293b; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-right: 4px; display: inline-block; margin-bottom: 2px;">${falla}: ${cnt}</span>`;
         });
         if (!failBadges) failBadges = '<span style="color: #64748b; font-size: 0.75rem;">Sin falla registrada</span>';
 
         html += `
             <tr>
-                <td style="font-weight: 600;">
-                    <span style="background-color: ${color}; color: #1e293b; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; display: inline-block;">${modelo}</span>
-                </td>
-                <td style="white-space: normal; line-height: 1.8;">${failBadges}</td>
-                <td style="font-weight: bold; color: var(--accent-primary); text-align: center; font-size: 1.05rem;">${total}</td>
+                <td style="font-weight: 600;">${modelo}</td>
+                <td style="white-space: normal; line-height: 1.5;">${failBadges}</td>
+                <td style="font-weight: bold; color: var(--accent-primary); text-align: center;">${total}</td>
             </tr>
         `;
     });
