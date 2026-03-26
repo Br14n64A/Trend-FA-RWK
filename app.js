@@ -1605,13 +1605,17 @@ function renderSecondTable(sortedModels, modelCounts, modelFailures) {
         const hue = (200 + i * 25) % 360;
         const color = `hsl(${hue}, 80%, 60%)`;
 
-        // Construir badges de fallas
+        // Construir badges de fallas con estilo unificado a FIRST
         let failBadges = '';
-        Object.entries(fallas)
-            .sort((a, b) => b[1] - a[1])
-            .forEach(([falla, cnt]) => {
-                failBadges += `<span style="background-color: rgba(248,113,113,0.2); border: 1px solid #f87171; color: #f87171; padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin-right: 4px; display: inline-block; margin-bottom: 3px;">${falla}: ${cnt}</span>`;
-            });
+        const failureEntries = Object.entries(fallas).sort((a, b) => b[1] - a[1]);
+        
+        failureEntries.forEach(([falla, cnt], idx) => {
+            // Generar un color suave para cada falla (azul-teal-índigo)
+            const fHue = (190 + idx * 20) % 360;
+            const fColor = `hsl(${fHue}, 70%, 85%)`; 
+            
+            failBadges += `<span style="background-color: ${fColor}; color: #1e293b; padding: 2px 7px; border-radius: 5px; font-size: 0.72rem; font-weight: bold; margin-right: 5px; display: inline-block; margin-bottom: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${falla}: ${cnt}</span>`;
+        });
         if (!failBadges) failBadges = '<span style="color: #64748b; font-size: 0.75rem;">Sin falla registrada</span>';
 
         html += `
