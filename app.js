@@ -901,24 +901,41 @@ function processSalidas(rows) {
 
 function processSecond(rows) {
     // Hoja SECOND: columna B (índice 1) = Modelo, columna C (índice 2) = Falla
-    // Saltar fila de encabezado (fila 0) y procesar desde fila 1 en adelante
     if (!rows || rows.length < 2) return { modelCounts: {}, modelFailures: {} };
 
-    const modelCounts = {};   // { modelo: count }
-    const modelFailures = {}; // { modelo: { falla: count } }
+    const modelCounts = {};   
+    const modelFailures = {}; 
+
+    // Mapa de traducción de códigos numéricos a nombres comerciales
+    const nameMap = {
+        "7021206": "NOGA",
+        "7020906": "JUPITER",
+        "7020907": "JUPITER",
+        "7017786": "CORDITE",
+        "7021697": "CORDITE",
+        "7021651": "UPDB",
+        "7017916": "MIDPLANE",
+        "7021135": "LUNAR",
+        "7020452": "MAKALU",
+        "7020456": "NOGA",
+        "7021698": "UC MODULE",
+        "7021205": "NOGA"
+    };
 
     for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (!row) continue;
 
-        const modelo = String(row[1] || '').trim(); // Columna B (índice 1)
-        const falla  = String(row[2] || '').trim(); // Columna C (índice 2)
+        const rawModel = String(row[1] || '').trim(); // Columna B (índice 1)
+        const falla    = String(row[2] || '').trim(); // Columna C (índice 2)
 
-        // Ignorar filas vacías o de encabezado
-        if (!modelo || modelo.toUpperCase() === 'MODEL' ||
-            modelo.toUpperCase() === 'ASSY PN' ||
-            modelo.toUpperCase() === 'MODELO' ||
-            modelo.toUpperCase() === 'N/A') continue;
+        // Ignorar encabezados o ruido
+        if (!rawModel || rawModel.toUpperCase() === 'MODEL' || 
+            rawModel.toUpperCase() === 'MODELO' || 
+            rawModel.toUpperCase() === 'N/A') continue;
+
+        // Traducir nombre usando el mapa, o dejar el original si no está mapeado
+        const modelo = nameMap[rawModel] || rawModel;
 
         // Contar modelos
         modelCounts[modelo] = (modelCounts[modelo] || 0) + 1;
@@ -930,7 +947,7 @@ function processSecond(rows) {
         }
     }
 
-    console.log('[processSecond] Modelos encontrados:', JSON.stringify(modelCounts));
+    console.log('[processSecond] Modelos traducidos encontrados:', JSON.stringify(modelCounts));
     return { modelCounts, modelFailures };
 }
 
