@@ -906,8 +906,8 @@ function processSecond(rows) {
     const modelCounts = {};   
     const modelFailures = {}; 
 
-    // Mapa de traducción de códigos numéricos a nombres comerciales
-    const nameMap = {
+    // Mapa de traducción de códigos numéricos de la hoja SECOND a categorías del Dashboard
+    const secondModelToCategory = {
         "7021206": "NOGA",
         "7020906": "JUPITER",
         "7020907": "JUPITER",
@@ -926,28 +926,43 @@ function processSecond(rows) {
         const row = rows[i];
         if (!row) continue;
 
-        const rawModel = String(row[1] || '').trim(); // Columna B (índice 1)
+        const rawValue = String(row[1] || '').trim(); // Columna B (índice 1)
         const falla    = String(row[2] || '').trim(); // Columna C (índice 2)
 
         // Ignorar encabezados o ruido
-        if (!rawModel || rawModel.toUpperCase() === 'MODEL' || 
-            rawModel.toUpperCase() === 'MODELO' || 
-            rawModel.toUpperCase() === 'N/A') continue;
+        if (!rawValue || rawValue.toUpperCase() === 'MODEL' || 
+            rawValue.toUpperCase() === 'MODELO' || 
+            rawValue.toUpperCase() === 'N/A') continue;
 
-        // Traducir nombre usando el mapa, o dejar el original si no está mapeado
-        const modelo = nameMap[rawModel] || rawModel;
+        // Intentar mapear a una categoría conocida:
+        // 1. Usar el mapa específico de 7 dígitos de SECOND
+        let category = secondModelToCategory[rawValue];
+        
+        // 2. Si no es un código de 7 dígitos, probar si es un serial largo en SERIAL_TO_CATEGORY
+        if (!category) {
+            category = SERIAL_TO_CATEGORY[rawValue.toUpperCase()];
+        }
+
+        // 3. Si sigue sin mapearse, usar la función getCategory general (que usa MODEL_MAP)
+        if (!category || category === "OTHER") {
+            const fallbackCat = getCategory(rawValue);
+            if (fallbackCat !== "OTHER") category = fallbackCat;
+        }
+
+        // Determinar nombre final: Categoría mapeada > Nombre descriptivo > Valor original
+        const finalName = (category && category !== "OTHER") ? category : (getMappedName(rawValue) || rawValue);
 
         // Contar modelos
-        modelCounts[modelo] = (modelCounts[modelo] || 0) + 1;
+        modelCounts[finalName] = (modelCounts[finalName] || 0) + 1;
 
         // Agrupar fallas por modelo
         if (falla && falla.toUpperCase() !== 'N/A') {
-            if (!modelFailures[modelo]) modelFailures[modelo] = {};
-            modelFailures[modelo][falla] = (modelFailures[modelo][falla] || 0) + 1;
+            if (!modelFailures[finalName]) modelFailures[finalName] = {};
+            modelFailures[finalName][falla] = (modelFailures[finalName][falla] || 0) + 1;
         }
     }
 
-    console.log('[processSecond] Modelos traducidos encontrados:', JSON.stringify(modelCounts));
+    console.log('[processSecond] Modelos procesados:', JSON.stringify(modelCounts));
     return { modelCounts, modelFailures };
 }
 
