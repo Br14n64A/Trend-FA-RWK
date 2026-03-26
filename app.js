@@ -543,12 +543,9 @@ function restoreState() {
     // Restore Second Failures
     const secondData = stored.secondData || stored.seconsData;
     if (secondData) {
-        if (Array.isArray(secondData) && secondData.length > 0) {
-            renderSecondChart('secondChart', secondData);
-        } else if (secondData.counts && typeof secondData.counts === 'object') {
-            // If it was stored in summary format, we can still render it if we adapt renderSecondChart
-            renderSecondChart('secondChart', secondData);
-        }
+        // Nuevo formato: { modelCounts, modelFailures }
+        // Formato legacy: Array de filas
+        renderSecondChart('secondChart', secondData);
     }
 
     if (stored.altoAgingData && Object.keys(stored.altoAgingData).length > 0) {
@@ -852,8 +849,38 @@ function processSalidas(rows) {
 }
 
 function processSecond(rows) {
-    if (rows.length < 2) return [];
-    return rows; // Keep headers to allow concatenated structure handling in render
+    // Hoja SECOND: columna B (índice 1) = Modelo, columna C (índice 2) = Falla
+    // Saltar fila de encabezado (fila 0) y procesar desde fila 1 en adelante
+    if (!rows || rows.length < 2) return { modelCounts: {}, modelFailures: {} };
+
+    const modelCounts = {};   // { modelo: count }
+    const modelFailures = {}; // { modelo: { falla: count } }
+
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row) continue;
+
+        const modelo = String(row[1] || '').trim(); // Columna B (índice 1)
+        const falla  = String(row[2] || '').trim(); // Columna C (índice 2)
+
+        // Ignorar filas vacías o de encabezado
+        if (!modelo || modelo.toUpperCase() === 'MODEL' ||
+            modelo.toUpperCase() === 'ASSY PN' ||
+            modelo.toUpperCase() === 'MODELO' ||
+            modelo.toUpperCase() === 'N/A') continue;
+
+        // Contar modelos
+        modelCounts[modelo] = (modelCounts[modelo] || 0) + 1;
+
+        // Agrupar fallas por modelo
+        if (falla && falla.toUpperCase() !== 'N/A') {
+            if (!modelFailures[modelo]) modelFailures[modelo] = {};
+            modelFailures[modelo][falla] = (modelFailures[modelo][falla] || 0) + 1;
+        }
+    }
+
+    console.log('[processSecond] Modelos encontrados:', JSON.stringify(modelCounts));
+    return { modelCounts, modelFailures };
 }
 
 function processFirst(rows) {
@@ -1391,189 +1418,163 @@ function renderFirstTable(counts, colors, sortedModels) {
 }
 
 function renderSecondChart(canvasId, data) {
-    const componentModelCounts = {};
-    const components = new Set();
-    const models = new Set();
-    const componentCDetails = {}; 
-    let grandTotal = 0;
+    // Nueva lógica: data = { modelCounts: {modelo: count}, modelFailures: {modelo: {falla: count}} }
+    // Compatibilidad hacia atrás: si data es Array (formato antiguo), ignorar y mostrar vacío
+    let modelCounts = {};
+    let modelFailures = {};
 
-    // Column J (index 9) is Component (Location), Column C (index 2) is Model (Assy PN), Column H (index 7) is Details (ReasonInformation)
-    if (Array.isArray(data)) {
-        data.forEach(row => {
-            // Skip header rows or non-data rows
-            if (!row || row.length < 5 || row[0] === 'NO' || (typeof row[0] === 'string' && row[0].toUpperCase().includes('SECOND'))) {
-                return;
-            }
-
-            const component = String(row[9] || row[3] || 'Unknown').trim(); // Use index 9 but fallback to 3 if index 9 is empty
-            const rawModel = String(row[2] || row[1] || 'Unknown').trim(); // Use index 2 but fallback to 1 if index 2 is empty
-            const model = getCategory(rawModel);
-            const colH = String(row[7] || row[2] || 'N/A').trim(); // Use index 7 but fallback to 2 if index 7 is empty
-
-            if (model !== "OTHER" && component !== '' && component.toUpperCase() !== 'N/A' && component.toUpperCase() !== 'UNKNOWN') {
-                components.add(component);
-                models.add(model);
-
-                if (!componentModelCounts[component]) componentModelCounts[component] = {};
-                componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
-
-                // Track details per component and model (using colH which corresponds to ReasonInformation)
-                if (colH && colH.toUpperCase() !== 'N/A') {
-                    if (!componentCDetails[component]) componentCDetails[component] = {};
-                    if (!componentCDetails[component][model]) componentCDetails[component][model] = {};
-                    componentCDetails[component][model][colH] = (componentCDetails[component][model][colH] || 0) + 1;
-                }
-
-                grandTotal++;
-            }
-        });
-    } else if (data && data.counts && data.details) {
-        // Handle summary object format
-        Object.entries(data.counts).forEach(([model, count]) => {
-            // Note: Summary object format usually maps counts differently
-            // but we'll try to reconstruct a basic view
-            // If data.details has the list of SNs, it's hard to map back to components
-            console.warn("[renderSecondChart] Received summary object format, limited detail will be shown.");
-        });
-        // This part is tricky because the summary object format lost the component mapping.
-        // We'll just skip rendering if it's the wrong format, or show a message.
+    if (data && !Array.isArray(data) && data.modelCounts) {
+        modelCounts  = data.modelCounts  || {};
+        modelFailures = data.modelFailures || {};
+    } else if (Array.isArray(data)) {
+        // Formato antiguo (array de filas): re-procesar con nueva lógica
+        console.warn('[renderSecondChart] Datos en formato Array (antiguo). Re-procesando...');
+        const reprocesado = processSecond(data);
+        modelCounts   = reprocesado.modelCounts;
+        modelFailures = reprocesado.modelFailures;
     }
+
+    const grandTotal = Object.values(modelCounts).reduce((s, v) => s + v, 0);
 
     // Update grand total in UI
     const totalEl = document.getElementById('secondTotal');
     if (totalEl) totalEl.textContent = `Total: ${grandTotal}`;
 
-    const sortedComponents = Array.from(components).sort((a, b) => {
-        const totalA = Object.values(componentModelCounts[a]).reduce((s, v) => s + v, 0);
-        const totalB = Object.values(componentModelCounts[b]).reduce((s, v) => s + v, 0);
-        return totalB - totalA;
-    }).slice(0, 15); // Top 15
+    // Ordenar modelos por cantidad descendente; top 20 para legibilidad
+    const sortedModels = Object.keys(modelCounts)
+        .sort((a, b) => modelCounts[b] - modelCounts[a])
+        .slice(0, 20);
 
-    const sortedModels = Array.from(models).sort();
-    const colors = ['#f472b6', '#34d399', '#38bdf8', '#fbbf24', '#818cf8', '#a78bfa'];
+    const values = sortedModels.map(m => modelCounts[m]);
 
-    const datasets = sortedModels.map((model, i) => ({
-        label: model,
-        data: sortedComponents.map(comp => componentModelCounts[comp][model] || 0),
-        backgroundColor: colors[i % colors.length],
-        borderRadius: 4,
-        barPercentage: 0.6,
-        categoryPercentage: 0.7
-    }));
+    // Colores por barra (gradiente de tonos)
+    const barColors = sortedModels.map((_, i) => {
+        const hue = (200 + i * 25) % 360;
+        return `hsl(${hue}, 80%, 60%)`;
+    });
 
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
     if (charts.second) charts.second.destroy();
 
-    charts.second = new Chart(ctx, {
+    charts.second = new Chart(ctx.getContext('2d'), {
         type: 'bar',
         data: {
-            labels: sortedComponents,
-            datasets: datasets
+            labels: sortedModels,
+            datasets: [{
+                label: 'SECOND Failures',
+                data: values,
+                backgroundColor: barColors,
+                borderRadius: 5,
+                barPercentage: 0.7,
+                categoryPercentage: 0.8
+            }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             layout: { padding: { top: 40 } },
             scales: {
-                x: { stacked: true, grid: { display: false }, ticks: { color: '#475569' } },
-                y: { stacked: true, beginAtZero: true, grace: '25%', grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { color: '#475569', precision: 0 } }
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color: '#475569',
+                        maxRotation: 35,
+                        minRotation: 0,
+                        font: { size: 10 }
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grace: '20%',
+                    grid: { color: 'rgba(0,0,0,0.1)' },
+                    ticks: { color: '#475569', precision: 0 }
+                }
             },
             plugins: {
-                legend: {
-                    position: 'top',
-                    labels: { color: '#475569', font: { size: 10, family: 'Outfit' } }
-                },
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        afterBody: (context) => {
-                            const component = context[0].label;
-                            const model = context[0].dataset.label;
-                            const hEntries = (componentCDetails[component] || {})[model] || {};
-                            
+                        title: (context) => `Modelo: ${context[0].label}`,
+                        label: (context) => `Cantidad: ${context.raw}`,
+                        afterLabel: (context) => {
+                            const modelo = context.label;
+                            const fallas = modelFailures[modelo] || {};
                             const lines = [];
-                            if (Object.keys(hEntries).length > 0) {
-                                lines.push("Fallas:");
-                                Object.entries(hEntries).forEach(([val, count]) => {
-                                    lines.push(` • ${val}: ${count}`);
-                                });
+                            if (Object.keys(fallas).length > 0) {
+                                lines.push('Fallas:');
+                                // Ordenar fallas por frecuencia
+                                Object.entries(fallas)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .forEach(([falla, cnt]) => {
+                                        lines.push(` • ${falla}: ${cnt}`);
+                                    });
                             }
                             return lines;
                         }
                     }
                 }
-            },
+            }
         },
         plugins: [{
-            id: 'stackedTopLabelsPluginSecond',
+            id: 'secondTopLabels',
             afterDraw: (chart) => {
-                const ctx = chart.ctx;
-                ctx.font = 'bold 13px Outfit';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#000000';
-
-                sortedComponents.forEach((comp, index) => {
-                    const total = Object.values(componentModelCounts[comp]).reduce((s, v) => s + v, 0);
-                    let highestY = chart.scales.y.bottom;
-                    let posX = 0;
-                    let found = false;
-
-                    for (let i = chart.data.datasets.length - 1; i >= 0; i--) {
-                        const m = chart.getDatasetMeta(i);
-                        if (m.data[index] && !m.hidden && m.data[index].y) {
-                            if (m.data[index].y < highestY) {
-                                highestY = m.data[index].y;
-                                posX = m.data[index].x;
-                                found = true;
-                            }
-                        }
-                    }
-                    if (total > 0 && found) {
-                        ctx.fillText(total, posX, highestY - 10);
+                const c = chart.ctx;
+                c.save();
+                c.font = 'bold 12px Outfit';
+                c.textAlign = 'center';
+                c.textBaseline = 'bottom';
+                c.fillStyle = '#1e293b';
+                chart.data.datasets[0]?.data.forEach((val, index) => {
+                    if (val > 0) {
+                        const meta = chart.getDatasetMeta(0);
+                        const bar = meta.data[index];
+                        c.fillText(val, bar.x, bar.y - 4);
                     }
                 });
+                c.restore();
             }
         }]
     });
 
-    renderSecondTable(componentModelCounts, colors, sortedModels);
+    renderSecondTable(sortedModels, modelCounts, modelFailures);
 }
 
-function renderSecondTable(counts, colors, sortedModels) {
+function renderSecondTable(sortedModels, modelCounts, modelFailures) {
     const tbody = document.getElementById('secondTableBody');
     if (!tbody) return;
 
     let html = '';
-    const sortedComps = Object.keys(counts).sort((a, b) => {
-        const totalA = Object.values(counts[a]).reduce((sum, val) => sum + val, 0);
-        const totalB = Object.values(counts[b]).reduce((sum, val) => sum + val, 0);
-        return totalB - totalA;
-    });
 
-    sortedComps.forEach(comp => {
-        const total = Object.values(counts[comp]).reduce((sum, val) => sum + val, 0);
-        // Discard components with no failure
+    sortedModels.forEach((modelo, i) => {
+        const total = modelCounts[modelo] || 0;
         if (total < 1) return;
 
-        let badgesHtml = '';
-        sortedModels.forEach((model, i) => {
-            const count = counts[comp][model] || 0;
-            if (count > 0) {
-                const color = colors[i % colors.length];
-                badgesHtml += `<span style="background-color: ${color}; color: #1e293b; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-right: 4px; display: inline-block; margin-bottom: 2px;">${model}: ${count}</span>`;
-            }
-        });
+        const fallas = modelFailures[modelo] || {};
+        const hue = (200 + i * 25) % 360;
+        const color = `hsl(${hue}, 80%, 60%)`;
+
+        // Construir badges de fallas
+        let failBadges = '';
+        Object.entries(fallas)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([falla, cnt]) => {
+                failBadges += `<span style="background-color: rgba(248,113,113,0.2); border: 1px solid #f87171; color: #f87171; padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; margin-right: 4px; display: inline-block; margin-bottom: 3px;">${falla}: ${cnt}</span>`;
+            });
+        if (!failBadges) failBadges = '<span style="color: #64748b; font-size: 0.75rem;">Sin falla registrada</span>';
 
         html += `
             <tr>
-                <td style="font-weight: 600;">${comp}</td>
-                <td style="white-space: normal; line-height: 1.5;">${badgesHtml}</td>
-                <td style="font-weight: bold; color: var(--accent-primary); text-align: center;">${total}</td>
+                <td style="font-weight: 600;">
+                    <span style="background-color: ${color}; color: #1e293b; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; display: inline-block;">${modelo}</span>
+                </td>
+                <td style="white-space: normal; line-height: 1.8;">${failBadges}</td>
+                <td style="font-weight: bold; color: var(--accent-primary); text-align: center; font-size: 1.05rem;">${total}</td>
             </tr>
         `;
     });
 
-    if (!html) html = '<tr><td colspan="3" style="text-align: center; color: #94a3b8;">No hay componentes críticos en SECOND.</td></tr>';
+    if (!html) html = '<tr><td colspan="3" style="text-align: center; color: #94a3b8;">No hay datos en SECOND.</td></tr>';
     tbody.innerHTML = html;
 }
 
