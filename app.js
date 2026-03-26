@@ -543,9 +543,20 @@ function restoreState() {
     // Restore Second Failures
     const secondData = stored.secondData || stored.seconsData;
     if (secondData) {
-        // Nuevo formato: { modelCounts, modelFailures }
-        // Formato legacy: Array de filas
-        renderSecondChart('secondChart', secondData);
+        // Detectar formato válido: { modelCounts, modelFailures }
+        const isNewFormat = secondData && !Array.isArray(secondData) && secondData.modelCounts;
+        // Detectar formato obsoleto: { counts, details } o Array crudo
+        const isLegacyFormat = Array.isArray(secondData) || (secondData && secondData.counts);
+
+        if (isNewFormat) {
+            renderSecondChart('secondChart', secondData);
+        } else if (isLegacyFormat) {
+            // Limpiar la caché obsoleta — se actualizará cuando el usuario suba el Excel
+            console.log('[restoreState] secondData en formato obsoleto, limpiando caché...');
+            delete stored.secondData;
+            delete stored.seconsData;
+            // No renderizar — el gráfico quedará vacío hasta la próxima subida de archivo
+        }
     }
 
     if (stored.altoAgingData && Object.keys(stored.altoAgingData).length > 0) {
@@ -686,7 +697,16 @@ function handleFileUpload(e) {
     reader.onload = async function (e) {
         try {
             const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
+            const workbook = XLSX.read(data, {
+                type: 'array',
+                cellNF: true,      // leer formatos de número
+                cellDates: true,   // convertir fechas
+                cellText: false,   // no usar texto formateado
+                cellFormula: true  // leer fórmulas y sus valores cacheados
+            });
+
+            // ── DEBUG: Mostrar todas las hojas disponibles en el workbook ──
+            console.log('[WORKBOOK] Hojas disponibles:', workbook.SheetNames);
 
             // Verificar si hay cambio de semana antes de procesar los nuevos datos
             await checkWeeklyReset();
@@ -747,14 +767,45 @@ function handleFileUpload(e) {
             if (!secondSheetName) {
                 secondSheetName = workbook.SheetNames.find(n => n.trim().toUpperCase().includes('SECOND')) || workbook.SheetNames[5];
             }
+            console.log('[SECOND] Nombre de hoja detectado:', secondSheetName);
+
             const secondSheet = secondSheetName ? workbook.Sheets[secondSheetName] : null;
-            let secondData = [];
+            let secondData = { modelCounts: {}, modelFailures: {} };
+
             if (secondSheet) {
-                const rows = XLSX.utils.sheet_to_json(secondSheet, { header: 1 });
+                // Usar defval:'' para que filas con fórmulas vacías/no-evaluadas
+                // no sean ignoradas; raw:true para obtener valores numéricos exactos.
+                const rows = XLSX.utils.sheet_to_json(secondSheet, {
+                    header: 1,
+                    defval: '',
+                    raw: true
+                });
+
+                // ── DEBUG: Mostrar las primeras 8 filas de la hoja SECOND ──
+                console.log('[SECOND] Total filas leídas:', rows.length);
+                console.log('[SECOND] Primeras 8 filas (raw):');
+                rows.slice(0, 8).forEach((row, i) => {
+                    console.log(`  Fila ${i}:`, JSON.stringify(row));
+                });
+
+                // Verificar si hay valores o si todo está vacío (fórmulas no evaluadas)
+                const nonEmptyRows = rows.slice(1).filter(r =>
+                    r && (String(r[1] || '').trim() !== '' || String(r[2] || '').trim() !== '')
+                );
+                console.log('[SECOND] Filas con datos en col B o C:', nonEmptyRows.length);
+
+                if (nonEmptyRows.length === 0) {
+                    console.warn('[SECOND] ⚠️ ADVERTENCIA: Las columnas B y C están vacías.');
+                    console.warn('[SECOND] Posible causa: la hoja usa fórmulas cuyo valor NO fue cacheado al guardar el archivo.');
+                    console.warn('[SECOND] Solución: En Excel, presiona Ctrl+Alt+F9 para recalcular y luego guarda.');
+                    updateStatus('⚠️ SECOND: Datos vacíos. Ver consola para diagnóstico.', 'error');
+                }
+
                 secondData = processSecond(rows);
                 renderSecondChart('secondChart', secondData);
             } else {
-                console.warn('[SECOND] Hoja SECOND no encontrada en el archivo Excel.');
+                console.warn('[SECOND] ⚠️ Hoja SECOND no encontrada. Hojas disponibles:', workbook.SheetNames);
+                updateStatus('⚠️ SECOND: Hoja no encontrada en el archivo.', 'error');
             }
 
             // 6. GOLES (Search by name "GOLES" or index 4)
