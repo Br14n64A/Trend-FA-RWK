@@ -104,6 +104,22 @@ const MODEL_MAP = {
     "1A728J700-600-G": "CORDITE S1"
 };
 
+const MODEL_CODE_MAP = {
+    "7021206": "NOGA",
+    "7020906": "JUPITER",
+    "7020907": "JUPITER",
+    "7017786": "CORDITE",
+    "7021697": "CORDITE",
+    "7021651": "UPDB",
+    "7017916": "MIDPLANE",
+    "7021135": "LUNAR",
+    "7020452": "MAKALU",
+    "7020456": "NOGA",
+    "7021698": "UC MODULE",
+    "7021205": "NOGA"
+};
+
+
 const CATEGORIES = ["MB", "NOGA", "JUPITER", "CORDITE", "UPDB", "MIDPLANE", "UC Module", "RISER", "SSD"];
 
 const AGING_CATEGORIES = [
@@ -204,6 +220,10 @@ function getCategory(rawModel) {
     const upperTrimmed = trimmed.toUpperCase();
     if (SERIAL_TO_CATEGORY[upperTrimmed]) {
         return SERIAL_TO_CATEGORY[upperTrimmed];
+    }
+
+    if (MODEL_CODE_MAP[trimmed]) {
+        return MODEL_CODE_MAP[trimmed];
     }
 
     // Fallback logic by name keyword matching
@@ -906,21 +926,8 @@ function processSecond(rows) {
     const modelCounts = {};   
     const modelFailures = {}; 
 
-    // Mapa de traducción de códigos numéricos de la hoja SECOND a categorías del Dashboard
-    const secondModelToCategory = {
-        "7021206": "NOGA",
-        "7020906": "JUPITER",
-        "7020907": "JUPITER",
-        "7017786": "CORDITE",
-        "7021697": "CORDITE",
-        "7021651": "UPDB",
-        "7017916": "MIDPLANE",
-        "7021135": "LUNAR",
-        "7020452": "MAKALU",
-        "7020456": "NOGA",
-        "7021698": "UC MODULE",
-        "7021205": "NOGA"
-    };
+    // Map de traducción de códigos numéricos de la hoja SECOND a categorías del Dashboard
+    // Moved to global MODEL_CODE_MAP at top
 
     for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
@@ -936,7 +943,7 @@ function processSecond(rows) {
 
         // Intentar mapear a una categoría conocida:
         // 1. Usar el mapa específico de 7 dígitos de SECOND
-        let category = secondModelToCategory[rawValue];
+        let category = MODEL_CODE_MAP[rawValue];
         
         // 2. Si no es un código de 7 dígitos, probar si es un serial largo en SERIAL_TO_CATEGORY
         if (!category) {
@@ -1219,8 +1226,8 @@ async function updateAccumulatedData(fileIdentifier) {
 
 function renderDashboard(entradasData, salidasData, firstData) {
     renderSummaryTable();
-    // Entradas: Model Serial is Column D (index 3). Graph exact models using useRawModel = true
-    if (entradasData) renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal", true);
+    // Entradas: Column D (index 3). We now use useRawModel = false to show category names (NOGA, JUPITER, etc.)
+    if (entradasData) renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal", false);
     // Salidas: Model Serial is Column C (index 2)
     if (salidasData) renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal", false);
     
