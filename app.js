@@ -326,6 +326,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnDownloadAltoAging = document.getElementById('btnDownloadAltoAging');
     if (btnDownloadAltoAging) btnDownloadAltoAging.addEventListener('click', exportAltoAgingToExcel);
 
+    const btnDownloadEntradas = document.getElementById('btnDownloadEntradas');
+    if (btnDownloadEntradas) btnDownloadEntradas.addEventListener('click', () => {
+        if (window.dashboard_storage && window.dashboard_storage.entradasData) {
+            exportGenericDataToExcel(window.dashboard_storage.entradasData, 'Entradas', 'Entradas_Source_Data');
+        } else {
+            updateStatus('No hay datos descargables para Entradas', 'error');
+        }
+    });
+
+    const btnDownloadSalidas = document.getElementById('btnDownloadSalidas');
+    if (btnDownloadSalidas) btnDownloadSalidas.addEventListener('click', () => {
+        if (window.dashboard_storage && window.dashboard_storage.salidasData) {
+            exportGenericDataToExcel(window.dashboard_storage.salidasData, 'Salidas', 'Salidas_Source_Data');
+        } else {
+            updateStatus('No hay datos descargables para Salidas', 'error');
+        }
+    });
+
+    const btnDownloadFirst = document.getElementById('btnDownloadFirst');
+    if (btnDownloadFirst) btnDownloadFirst.addEventListener('click', () => {
+        if (window.dashboard_storage && window.dashboard_storage.firstData) {
+            exportGenericDataToExcel(window.dashboard_storage.firstData, 'FIRST', 'FIRST_Source_Data');
+        } else {
+            updateStatus('No hay datos descargables para FIRST', 'error');
+        }
+    });
+
+    const btnDownloadSecond = document.getElementById('btnDownloadSecond');
+    if (btnDownloadSecond) btnDownloadSecond.addEventListener('click', () => {
+        if (window.dashboard_storage && window.dashboard_storage.secondData && window.dashboard_storage.secondData.validRows) {
+            exportGenericDataToExcel(window.dashboard_storage.secondData.validRows, 'SECOND', 'SECOND_Source_Data');
+        } else {
+            updateStatus('No hay datos descargables para SECOND (Cargue el archivo de nuevo)', 'error');
+        }
+    });
+
+    const btnDownloadGoles = document.getElementById('btnDownloadGoles');
+    if (btnDownloadGoles) btnDownloadGoles.addEventListener('click', () => {
+        if (window.dashboard_storage && window.dashboard_storage.golesData && window.dashboard_storage.golesData.validRows) {
+            exportGenericDataToExcel(window.dashboard_storage.golesData.validRows, 'GOLES', 'GOLES_Source_Data');
+        } else {
+            // Compatibilidad hacia atrás
+            if (window.dashboard_storage && Array.isArray(window.dashboard_storage.golesData)) {
+                exportGenericDataToExcel(window.dashboard_storage.golesData, 'GOLES', 'GOLES_Source_Data');
+            } else {
+                updateStatus('No hay datos descargables para GOLES', 'error');
+            }
+        }
+    });
+
     // No export to excel button found in HTML, so we remove the listener to avoid errors
 
     const btnToggleEdit = document.getElementById('btnToggleEdit');
@@ -583,12 +633,17 @@ function restoreState() {
         renderAltoAgingChart(stored.altoAgingData);
     }
 
-    if (stored.golesData && stored.golesData.length > 0) {
-        renderGolesTable(stored.golesData);
+    if (stored.golesData) {
+        if (Array.isArray(stored.golesData) && stored.golesData.length > 0) {
+            renderGolesTable(stored.golesData); // Legacy
+        } else if (stored.golesData.goals && stored.golesData.goals.length > 0) {
+            renderGolesTable(stored.golesData.goals); // New
+        }
     }
 
 
 }
+
 
 function getWeekId(date = new Date()) {
     const d = new Date(date.getTime());
@@ -838,7 +893,7 @@ function handleFileUpload(e) {
 
             const golesSheet = workbook.Sheets[golesSheetName];
 
-            let golesData = [];
+            let golesData = { goals: [], validRows: [] };
             if (golesSheet) {
                 const rows = XLSX.utils.sheet_to_json(golesSheet, { header: 1, defval: "" });
                 golesData = processGoles(rows);
@@ -856,7 +911,9 @@ function handleFileUpload(e) {
             renderAltoAgingChart(altoAgingData);
 
             renderDashboard(entradasData, salidasData, firstData);
-            if (golesData.length > 0) {
+            if (golesData.goals && golesData.goals.length > 0) {
+                renderGolesTable(golesData.goals);
+            } else if (Array.isArray(golesData) && golesData.length > 0) {
                 renderGolesTable(golesData);
             }
 
@@ -884,6 +941,7 @@ function handleFileUpload(e) {
 
 function processEntradas(rows) {
     if (rows.length < 2) return [];
+    const headers = rows[0] || [];
     const data = rows.slice(1);
     // Deduplicate by Column A (index 0)
     const unique = [];
@@ -896,11 +954,12 @@ function processEntradas(rows) {
             unique.push(row);
         }
     });
-    return unique;
+    return [headers, ...unique];
 }
 
 function processSalidas(rows) {
     if (rows.length < 2) return [];
+    const headers = rows[0] || [];
     const data = rows.slice(1);
     // Deduplicate by Column B (index 1)
     const unique = [];
@@ -916,12 +975,15 @@ function processSalidas(rows) {
             unique.push(row);
         }
     });
-    return unique;
+    return [headers, ...unique];
 }
 
 function processSecond(rows) {
     // Hoja SECOND: columna B (índice 1) = Modelo, columna C (índice 2) = Falla
-    if (!rows || rows.length < 2) return { modelCounts: {}, modelFailures: {} };
+    if (!rows || rows.length < 2) return { modelCounts: {}, modelFailures: {}, validRows: [] };
+
+    const headers = rows[0] || [];
+    const validRows = [headers];
 
     const modelCounts = {};   
     const modelFailures = {}; 
@@ -967,14 +1029,17 @@ function processSecond(rows) {
             if (!modelFailures[finalName]) modelFailures[finalName] = {};
             modelFailures[finalName][falla] = (modelFailures[finalName][falla] || 0) + 1;
         }
+        
+        validRows.push(row);
     }
 
     console.log('[processSecond] Modelos procesados:', JSON.stringify(modelCounts));
-    return { modelCounts, modelFailures };
+    return { modelCounts, modelFailures, validRows };
 }
 
 function processFirst(rows) {
     if (rows.length < 2) return [];
+    const headers = rows[0] || [];
     const data = rows.slice(1);
     const unique = [];
     const seen = new Set();
@@ -991,11 +1056,13 @@ function processFirst(rows) {
             unique.push(row);
         }
     });
-    return unique;
+    return [headers, ...unique];
 }
 
 function processGoles(rows) {
-    if (rows.length < 2) return [];
+    if (rows.length < 2) return { goals: [], validRows: [] };
+    const headers = rows[0] || [];
+    const validRows = [headers];
     const data = rows.slice(1);
     const golesMap = {};
 
@@ -1035,9 +1102,11 @@ function processGoles(rows) {
             // Default to WIP if unknown but row exists
             golesMap[goalId].wip++;
         }
+        
+        validRows.push(row);
     });
 
-    return Object.values(golesMap);
+    return { goals: Object.values(golesMap), validRows };
 }
 
 function formatDate(excelDate) {
@@ -1876,6 +1945,57 @@ async function exportAltoAgingToExcel() {
     } catch (err) {
         console.error('Alto Aging Export Error:', err);
         updateStatus('Error al generar Excel (Alto Aging)', 'error');
+    }
+}
+
+async function exportGenericDataToExcel(dataArray, sheetName, filename) {
+    if (!dataArray || dataArray.length < 2) {
+        updateStatus(`No hay datos fuente de ${sheetName} para exportar`, 'error');
+        return;
+    }
+
+    if (typeof ExcelJS === 'undefined') {
+        updateStatus('Error: ExcelJS no está cargado', 'error');
+        return;
+    }
+
+    updateStatus(`Generando Excel de ${sheetName}...`, 'info');
+
+    try {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'PCBA Dashboard';
+        const sheet = workbook.addWorksheet(sheetName);
+        
+        dataArray.forEach(row => {
+            const newRow = sheet.addRow(row);
+            newRow.alignment = { vertical: 'middle' };
+        });
+
+        const headerRow = sheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF475569' } };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+
+        sheet.columns.forEach(column => {
+            column.width = 15;
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.download = `${filename}_${dateStr}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        updateStatus(`Datos de ${sheetName} descargados`, 'success');
+    } catch (err) {
+        console.error(`${sheetName} Export Error:`, err);
+        updateStatus(`Error al generar Excel (${sheetName})`, 'error');
     }
 }
 

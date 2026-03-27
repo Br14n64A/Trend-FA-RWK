@@ -104,6 +104,10 @@
                             <div class="card-header">
                                 <h2>Entradas por Modelo</h2>
                                 <div class="header-tags">
+                                    <button class="nav-btn btn-excel" id="btnDownloadEntradas" title="Descargar datos originales de Entradas" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
+                                        <span class="btn-text">⬇️ Descargar Datos</span>
+                                        <span class="btn-icon">⬇️</span>
+                                    </button>
                                     <span class="pill" id="entradasTotal">Total: 0</span>
                                 </div>
                             </div>
@@ -117,6 +121,10 @@
                             <div class="card-header">
                                 <h2>Salidas por Modelo</h2>
                                 <div class="header-tags">
+                                    <button class="nav-btn btn-excel" id="btnDownloadSalidas" title="Descargar datos originales de Salidas" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
+                                        <span class="btn-text">⬇️ Descargar Datos</span>
+                                        <span class="btn-icon">⬇️</span>
+                                    </button>
                                     <span class="pill" id="salidasTotal">Total: 0</span>
                                 </div>
                             </div>
@@ -129,6 +137,10 @@
                             <div class="card-header">
                                 <h2>FIRST (Fallas por Componente)</h2>
                                 <div class="header-tags">
+                                    <button class="nav-btn btn-excel" id="btnDownloadFirst" title="Descargar datos originales de FIRST" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
+                                        <span class="btn-text">⬇️ Descargar Datos</span>
+                                        <span class="btn-icon">⬇️</span>
+                                    </button>
                                     <span class="pill" id="firstTotal">Total: 0</span>
                                 </div>
                             </div>
@@ -154,6 +166,10 @@
                             <div class="card-header">
                                 <h2>SECOND Failure (Fallas por Componente)</h2>
                                 <div class="header-tags">
+                                    <button class="nav-btn btn-excel" id="btnDownloadSecond" title="Descargar datos originales de SECOND" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
+                                        <span class="btn-text">⬇️ Descargar Datos</span>
+                                        <span class="btn-icon">⬇️</span>
+                                    </button>
                                     <span class="pill" id="secondTotal">Total: 0</span>
                                 </div>
                             </div>
@@ -215,7 +231,13 @@
                     <div class="card goles-card">
                         <div class="card-header">
                             <h2>Seguimiento de Goles de Producción</h2>
-                            <span class="pill">Hoja: Goles</span>
+                            <div class="header-tags" style="display: flex; gap: 10px; align-items: center;">
+                                <button class="nav-btn btn-excel" id="btnDownloadGoles" title="Descargar datos originales de Goles" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                    <span class="btn-text">⬇️ Descargar Datos</span>
+                                    <span class="btn-icon">⬇️</span>
+                                </button>
+                                <span class="pill">Hoja: Goles</span>
+                            </div>
                         </div>
                         <div class="goles-table-container">
                             <table class="goles-table" id="golesTable">
@@ -295,7 +317,7 @@
         </main>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=5.1"></script>
 </body>
 
 </html>
