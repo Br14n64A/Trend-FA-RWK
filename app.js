@@ -2433,9 +2433,11 @@ function renderSummaryTable() {
 }
 
 function getTrendClass(current, previous) {
-    if (current < previous) return "trend-down"; // Green
-    if (current > previous) return "trend-up";   // Red
-    return "trend-equal";                        // Yellow
+    // If current is 0, it's always green (Good/Success)
+    if (current === 0) return "trend-down";
+    if (current < previous) return "trend-down"; // Improved
+    if (current > previous) return "trend-up";   // Worsened
+    return "trend-equal";                        // Stable
 }
 
 
