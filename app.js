@@ -482,34 +482,97 @@ async function loadStateFromServer() {
 async function saveStateToServer() {
     if (!window.dashboard_storage) return;
 
-    // Guardar altoAgingSourceData y mrbSourceData en una clave SEPARADA de localStorage
-    // para que sobrevivan el refresco sin saturar el payload del servidor.
-    try {
-        if (window.dashboard_storage.altoAgingSourceData) {
-            localStorage.setItem('dashboard_alto_aging_source', JSON.stringify(window.dashboard_storage.altoAgingSourceData));
-        }
-        if (window.dashboard_storage.mrbSourceData) {
-            localStorage.setItem('dashboard_mrb_source', JSON.stringify(window.dashboard_storage.mrbSourceData));
-        }
-    } catch(e) {
-        console.warn('No se pudo guardar datos de Alto Aging en localStorage:', e);
+    const stored = window.dashboard_storage;
+
+    // 1. Prepare Summary Data for shared viewing (lightweight)
+    // Always refresh summaries if source data is present
+    if (stored.entradasData) {
+        stored.entradasSummary = summarizeCategoryCounts(stored.entradasData, 3);
+    }
+    if (stored.salidasData) {
+        stored.salidasSummary = summarizeCategoryCounts(stored.salidasData, 2);
+    }
+    if (stored.firstData) {
+        stored.firstSummary = summarizeFirstData(stored.firstData);
+    }
+    if (stored.golesData && stored.golesData.goals) {
+        stored.golesSummary = stored.golesData.goals;
     }
 
-    // Crear una copia de los datos para guardar, sin incluir
-    // la data original "cruda" del excel (sourceData) que es muy pesada
-    // y causa Error HTTP 413 (Payload Too Large) en el servidor php.
-    const dataToSave = { ...window.dashboard_storage };
-    delete dataToSave.altoAgingSourceData;
-    delete dataToSave.mrbSourceData;
+    // 2. Persistent Local Storage for heavy data (not synced to server)
+    try {
+        const largeDataMap = {
+            'dashboard_entradas_source': stored.entradasData,
+            'dashboard_salidas_source': stored.salidasData,
+            'dashboard_first_source': stored.firstData,
+            'dashboard_alto_aging_source': stored.altoAgingSourceData,
+            'dashboard_mrb_source': stored.mrbSourceData
+        };
 
-    // Always save locally
+        for (const [key, val] of Object.entries(largeDataMap)) {
+            if (val) localStorage.setItem(key, JSON.stringify(val));
+        }
+
+        // Handle objects with nested large arrays
+        if (stored.secondData && stored.secondData.validRows) {
+            localStorage.setItem('dashboard_second_source', JSON.stringify(stored.secondData.validRows));
+        } else if (Array.isArray(stored.secondData)) {
+            localStorage.setItem('dashboard_second_source', JSON.stringify(stored.secondData));
+        }
+
+        if (stored.golesData && stored.golesData.validRows) {
+            localStorage.setItem('dashboard_goles_source', JSON.stringify(stored.golesData.validRows));
+        }
+    } catch(e) {
+        console.warn('LocalStorage limit exceeded for source data:', e);
+    }
+
+    // 3. Create payload for server - EXCLUDE all heavy source arrays
+    const dataToSave = { ...stored };
+    
+    const keysToRemove = [
+        'altoAgingSourceData', 'mrbSourceData', 
+        'entradasData', 'salidasData', 'firstData', 
+        'rawData', 'filteredData' 
+    ];
+    
+    keysToRemove.forEach(k => delete dataToSave[k]);
+
+    // Prune secondData and golesData for server
+    if (dataToSave.secondData && dataToSave.secondData.validRows) {
+        dataToSave.secondData = { ...dataToSave.secondData };
+        delete dataToSave.secondData.validRows;
+    }
+    if (dataToSave.golesData && dataToSave.golesData.validRows) {
+        dataToSave.golesData = { ...dataToSave.golesData };
+        delete dataToSave.golesData.validRows;
+    }
+
+    // 3.5 DEEP HISTORY PRUNING: Ensure old history entries don't contain raw data
+    if (Array.isArray(dataToSave.history)) {
+        dataToSave.history = dataToSave.history.map(snapshot => {
+            const pruned = { ...snapshot };
+            keysToRemove.forEach(k => delete pruned[k]);
+            if (pruned.secondData) {
+                pruned.secondData = { ...pruned.secondData };
+                delete pruned.secondData.validRows;
+            }
+            if (pruned.golesData) {
+                pruned.golesData = { ...pruned.golesData };
+                delete pruned.golesData.validRows;
+            }
+            return pruned;
+        });
+    }
+
+    // Always save locally (the pruned version)
     try {
         localStorage.setItem('dashboard_storage', JSON.stringify(dataToSave));
     } catch (e) {
         console.error("Error saving local data:", e);
     }
 
-    // Save to server if on HTTP
+    // 4. Save to server if on HTTP
     if (window.location.protocol.startsWith('http')) {
         try {
             const response = await fetch('data_handler.php', {
@@ -518,14 +581,58 @@ async function saveStateToServer() {
                 body: JSON.stringify(dataToSave)
             });
             if (!response.ok) {
+                // If still 413, we might need even more pruning
                 throw new Error(`Error HTTP: ${response.status}`);
             }
             updateStatus('Sincronizado', 'success');
         } catch (e) {
             console.error("Error saving to server:", e);
-            updateStatus('Error de sincronización', 'error');
+            const msg = e.message.includes('413') ? 'Error: Datos de Excel muy pesados' : 'Error de sincronización';
+            updateStatus(msg, 'error');
         }
     }
+}
+
+function summarizeCategoryCounts(data, colIndex) {
+    const counts = {};
+    data.forEach(row => {
+        if (!Array.isArray(row)) return;
+        const rawModel = String(row[colIndex] || 'Unknown').trim();
+        if (!rawModel || rawModel.toUpperCase() === 'MODEL' || rawModel.toUpperCase() === 'N/A') return;
+        const category = getCategory(rawModel);
+        counts[category] = (counts[category] || 0) + 1;
+    });
+    return counts;
+}
+
+function summarizeFirstData(data) {
+    const componentModelCounts = {};
+    const componentHDetails = {}; 
+    const models = new Set();
+    const components = new Set();
+
+    data.forEach(row => {
+        if (!Array.isArray(row)) return;
+        const component = String(row[9] || 'Unknown').trim();
+        const rawModel = String(row[2] || 'Unknown').trim();
+        const model = getCategory(rawModel);
+        const colH = String(row[7] || 'N/A').trim();
+
+        if (model !== "OTHER") {
+            components.add(component);
+            models.add(model);
+            if (!componentModelCounts[component]) componentModelCounts[component] = {};
+            componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
+
+            if (colH && colH.toUpperCase() !== 'N/A') {
+                if (!componentHDetails[component]) componentHDetails[component] = {};
+                if (!componentHDetails[component][model]) componentHDetails[component][model] = {};
+                componentHDetails[component][model][colH] = (componentHDetails[component][model][colH] || 0) + 1;
+            }
+        }
+    });
+
+    return { componentModelCounts, componentHDetails, models: Array.from(models), components: Array.from(components) };
 }
 
 function switchView(viewId) {
@@ -587,19 +694,40 @@ function restoreState() {
     const stored = window.dashboard_storage;
     if (!stored || !stored.data) return;
 
-    // Intentar restaurar los datos de Alto Aging source desde su clave separada en localStorage
+    // Restore heavy source data from LocalStorage
     try {
-        const savedAltoAgingSource = localStorage.getItem('dashboard_alto_aging_source');
-        const savedMrbSource = localStorage.getItem('dashboard_mrb_source');
-        if (savedAltoAgingSource && !stored.altoAgingSourceData) {
-            stored.altoAgingSourceData = JSON.parse(savedAltoAgingSource);
-            console.log('Datos de Alto Aging source restaurados desde localStorage.');
+        const localSourceMap = {
+            'dashboard_entradas_source': 'entradasData',
+            'dashboard_salidas_source': 'salidasData',
+            'dashboard_first_source': 'firstData',
+            'dashboard_alto_aging_source': 'altoAgingSourceData',
+            'dashboard_mrb_source': 'mrbSourceData'
+        };
+
+        for (const [lsKey, objKey] of Object.entries(localSourceMap)) {
+            const savedData = localStorage.getItem(lsKey);
+            if (savedData && !stored[objKey]) {
+                stored[objKey] = JSON.parse(savedData);
+                console.log(`[restoreState] Restored ${objKey} from local storage.`);
+            }
         }
-        if (savedMrbSource && !stored.mrbSourceData) {
-            stored.mrbSourceData = JSON.parse(savedMrbSource);
+
+        // Restore nested sources
+        const savedSecond = localStorage.getItem('dashboard_second_source');
+        if (savedSecond && stored.secondData) {
+            if (Array.isArray(stored.secondData)) {
+                 stored.secondData = JSON.parse(savedSecond);
+            } else if (!stored.secondData.validRows) {
+                 stored.secondData.validRows = JSON.parse(savedSecond);
+            }
+        }
+
+        const savedGoles = localStorage.getItem('dashboard_goles_source');
+        if (savedGoles && stored.golesData && !stored.golesData.validRows) {
+            stored.golesData.validRows = JSON.parse(savedGoles);
         }
     } catch(e) {
-        console.warn('No se pudieron restaurar datos de Alto Aging source:', e);
+        console.warn('Error restoring state from local storage:', e);
     }
 
     // Restore Summary Table
@@ -687,9 +815,15 @@ async function checkWeeklyReset() {
         console.log(`Cambio de semana detectado: ${stored.weekId} -> ${currentWeekId}`);
         updateStatus(`Nueva semana: Archivando ${stored.weekId}...`, 'info');
 
-        // Crear respaldo en historial
+        // Crear respaldo en historial (solo datos ligeros)
         const snapshot = JSON.parse(JSON.stringify(stored));
-        delete snapshot.history; 
+        const heavyKeys = [
+            'history', 'entradasData', 'salidasData', 'firstData', 
+            'altoAgingSourceData', 'mrbSourceData', 'rawData', 'filteredData'
+        ];
+        heavyKeys.forEach(k => delete snapshot[k]);
+        if (snapshot.secondData) delete snapshot.secondData.validRows;
+        if (snapshot.golesData) delete snapshot.golesData.validRows;
         stored.history = stored.history || [];
         stored.history.unshift(snapshot);
         if (stored.history.length > 20) stored.history.pop(); // Guardar hasta 20 semanas
@@ -1295,31 +1429,53 @@ async function updateAccumulatedData(fileIdentifier) {
 
 function renderDashboard(entradasData, salidasData, firstData) {
     renderSummaryTable();
-    // Entradas: Column D (index 3). We now use useRawModel = false to show category names (NOGA, JUPITER, etc.)
-    if (entradasData) renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal", false);
-    // Salidas: Model Serial is Column C (index 2)
-    if (salidasData) renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal", false);
-    
-    if (firstData) renderFirstChart("firstChart", firstData);
+    const stored = window.dashboard_storage || {};
 
-    // Restore secondData if available (renderDashboard doesn't receive it, restoreState handles it)
+    // 1. Entradas: Try raw data first, then fallback to precomputed summary
+    if (entradasData && entradasData.length > 0) {
+        renderBarChart("entradasChart", entradasData, 3, "Entradas", "#38bdf8", "entradas", "entradasTotal", false);
+    } else if (stored.entradasSummary) {
+        renderBarChart("entradasChart", stored.entradasSummary, null, "Entradas", "#38bdf8", "entradas", "entradasTotal", false);
+    }
+
+    // 2. Salidas: Try raw data first, then fallback to precomputed summary
+    if (salidasData && salidasData.length > 0) {
+        renderBarChart("salidasChart", salidasData, 2, "Salidas", "#818cf8", "salidas", "salidasTotal", false);
+    } else if (stored.salidasSummary) {
+        renderBarChart("salidasChart", stored.salidasSummary, null, "Salidas", "#818cf8", "salidas", "salidasTotal", false);
+    }
+    
+    // 3. FIRST: Try raw data first, then fallback to precomputed summary
+    if (firstData && firstData.length > 0) {
+        renderFirstChart("firstChart", firstData);
+    } else if (stored.firstSummary) {
+        renderFirstChart("firstChart", stored.firstSummary);
+    }
+
+    // Restore secondData is handled in restoreState if needed
 }
 
 function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, totalElementId, useRawModel = false) {
-    const counts = {};
+    let counts = {};
     let grandTotal = 0;
 
-    data.forEach(row => {
-        const rawModel = String(row[modelColIndex] || 'Unknown').trim();
-        if (!rawModel || rawModel.toUpperCase() === 'MODEL' || rawModel.toUpperCase() === 'ASSY PN' || rawModel.toUpperCase() === 'N/A' || rawModel.toUpperCase() === 'UNKNOWN') return;
+    if (Array.isArray(data)) {
+        // Handle raw array of rows
+        data.forEach(row => {
+            const rawModel = String(row[modelColIndex] || 'Unknown').trim();
+            if (!rawModel || rawModel.toUpperCase() === 'MODEL' || rawModel.toUpperCase() === 'ASSY PN' || rawModel.toUpperCase() === 'N/A' || rawModel.toUpperCase() === 'UNKNOWN') return;
 
-        const category = useRawModel ? rawModel : getCategory(rawModel);
-        if (useRawModel || category !== "OTHER") {
-            counts[category] = (counts[category] || 0) + 1;
-            grandTotal++;
-        }
-    });
-
+            const category = useRawModel ? rawModel : getCategory(rawModel);
+            if (useRawModel || category !== "OTHER") {
+                counts[category] = (counts[category] || 0) + 1;
+                grandTotal++;
+            }
+        });
+    } else if (typeof data === 'object' && data !== null) {
+        // Handle precomputed summary object { category: count }
+        counts = data;
+        grandTotal = Object.values(counts).reduce((sum, val) => sum + val, 0);
+    }
 
     // Update grand total in UI
     const totalEl = document.getElementById(totalElementId);
@@ -1394,48 +1550,64 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
 
 function renderFirstChart(canvasId, data) {
     // Column J (index 9) is Component, Column C (index 2) is Model, Column H (index 7) is Details
-    const componentModelCounts = {};
-    const components = new Set();
-    const models = new Set();
-    const componentHDetails = {}; 
+    let componentModelCounts = {};
+    let componentHDetails = {}; 
+    let sortedModels = [];
+    let sortedComponents = [];
     let grandTotal = 0;
 
-    data.forEach(row => {
-        const component = String(row[9] || 'Unknown').trim();
-        const rawModel = String(row[2] || 'Unknown').trim();
-        const model = getCategory(rawModel);
-        const colH = String(row[7] || 'N/A').trim();
+    if (Array.isArray(data)) {
+        const components = new Set();
+        const models = new Set();
+        data.forEach(row => {
+            const component = String(row[9] || 'Unknown').trim();
+            const rawModel = String(row[2] || 'Unknown').trim();
+            const model = getCategory(rawModel);
+            const colH = String(row[7] || 'N/A').trim();
 
-        if (model !== "OTHER") {
-            components.add(component);
-            models.add(model);
+            if (model !== "OTHER") {
+                components.add(component);
+                models.add(model);
+                if (!componentModelCounts[component]) componentModelCounts[component] = {};
+                componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
 
-            if (!componentModelCounts[component]) componentModelCounts[component] = {};
-            componentModelCounts[component][model] = (componentModelCounts[component][model] || 0) + 1;
-
-            // Track Column H details per component and model (exclude N/A or empty)
-            if (colH && colH.toUpperCase() !== 'N/A') {
-                if (!componentHDetails[component]) componentHDetails[component] = {};
-                if (!componentHDetails[component][model]) componentHDetails[component][model] = {};
-                componentHDetails[component][model][colH] = (componentHDetails[component][model][colH] || 0) + 1;
+                if (colH && colH.toUpperCase() !== 'N/A') {
+                    if (!componentHDetails[component]) componentHDetails[component] = {};
+                    if (!componentHDetails[component][model]) componentHDetails[component][model] = {};
+                    componentHDetails[component][model][colH] = (componentHDetails[component][model][colH] || 0) + 1;
+                }
+                grandTotal++;
             }
-
-            grandTotal++;
-        }
-    });
-
+        });
+        
+        sortedComponents = Array.from(components).sort((a, b) => {
+            const totalA = Object.values(componentModelCounts[a]).reduce((s, v) => s + v, 0);
+            const totalB = Object.values(componentModelCounts[b]).reduce((s, v) => s + v, 0);
+            return totalB - totalA;
+        }).slice(0, 15);
+        
+        sortedModels = Array.from(models).sort();
+    } else {
+        // Use summary data directly
+        componentModelCounts = data.componentModelCounts || {};
+        componentHDetails = data.componentHDetails || {};
+        sortedModels = data.models || [];
+        sortedComponents = data.components || [];
+        grandTotal = Object.values(componentModelCounts).reduce((acc, modelsObj) => 
+            acc + Object.values(modelsObj).reduce((s, v) => s + v, 0), 0);
+        
+        // Final sort and slice just in case
+        sortedComponents = sortedComponents.sort((a, b) => {
+            const totalA = Object.values(componentModelCounts[a] || {}).reduce((s, v) => s + v, 0);
+            const totalB = Object.values(componentModelCounts[b] || {}).reduce((s, v) => s + v, 0);
+            return totalB - totalA;
+        }).slice(0, 15);
+    }
 
     // Update grand total in UI
     const totalEl = document.getElementById('firstTotal');
     if (totalEl) totalEl.textContent = `Total: ${grandTotal}`;
 
-    const sortedComponents = Array.from(components).sort((a, b) => {
-        const totalA = Object.values(componentModelCounts[a]).reduce((s, v) => s + v, 0);
-        const totalB = Object.values(componentModelCounts[b]).reduce((s, v) => s + v, 0);
-        return totalB - totalA;
-    }).slice(0, 15); // Top 15 components for readability
-
-    const sortedModels = Array.from(models).sort();
     const colors = ['#38bdf8', '#818cf8', '#34d399', '#f472b6', '#fbbf24', '#a78bfa'];
 
     const datasets = sortedModels.map((model, i) => ({
