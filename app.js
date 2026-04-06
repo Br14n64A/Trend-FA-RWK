@@ -120,7 +120,7 @@ const MODEL_CODE_MAP = {
 };
 
 
-const CATEGORIES = ["MB", "NOGA", "JUPITER", "CORDITE", "UPDB", "MIDPLANE", "UC Module", "RISER", "SSD"];
+const CATEGORIES = ["NOGA", "JUPITER", "CORDITE", "UPDB", "MIDPLANE", "RISER", "SSD"];
 
 const AGING_CATEGORIES = [
     "MAYOR A 90", "80 A 89", "70 A 79", "60 A 69",
@@ -862,14 +862,29 @@ async function checkWeeklyReset() {
     stored.data = stored.data || {};
     stored.prevFridayData = stored.prevFridayData || {};
 
+    const initialPrev = {
+        "NOGA": { count: 201, trend: "trend-up" },
+        "JUPITER": { count: 123, trend: "trend-down" },
+        "CORDITE": { count: 38, trend: "trend-up" },
+        "UPDB": { count: 249, trend: "trend-down" },
+        "MIDPLANE": { count: 15, trend: "trend-equal" },
+        "RISER": { count: 39, trend: "trend-down" },
+        "SSD": { count: 68, trend: "trend-up" }
+    };
+
     CATEGORIES.forEach(cat => {
         if (!stored.data[cat]) {
             stored.data[cat] = {};
             WEEK_DAYS.forEach(day => stored.data[cat][day] = 0);
             added = true;
         }
-        if (!stored.prevFridayData[cat]) {
-            stored.prevFridayData[cat] = { count: 0, trend: "trend-equal" };
+        // Force the specific values from the image if not already set or if explicitly requested
+        if (!stored.prevFridayData[cat] || Object.keys(stored.prevFridayData).length < 7) {
+            if (initialPrev[cat]) {
+                stored.prevFridayData[cat] = initialPrev[cat];
+            } else {
+                stored.prevFridayData[cat] = { count: 0, trend: "trend-equal" };
+            }
             added = true;
         }
     });
