@@ -120,7 +120,7 @@ const MODEL_CODE_MAP = {
 };
 
 
-const CATEGORIES = ["NOGA", "JUPITER", "CORDITE", "UPDB", "MIDPLANE", "RISER", "SSD"];
+const CATEGORIES = ["MB", "NOGA", "JUPITER", "CORDITE", "UPDB", "MIDPLANE", "UC Module", "RISER", "SSD"];
 
 const AGING_CATEGORIES = [
     "MAYOR A 90", "80 A 89", "70 A 79", "60 A 69",
@@ -734,7 +734,7 @@ function restoreState() {
     renderSummaryTable();
 
     // Restore Charts and GOLES
-    if (stored.entradasData || stored.salidasData || stored.firstData) {
+    if (stored.entradasData || stored.salidasData || stored.firstData || stored.entradasSummary || stored.salidasSummary || stored.firstSummary) {
         renderDashboard(stored.entradasData || [], stored.salidasData || [], stored.firstData || []);
     }
 
@@ -1066,7 +1066,6 @@ function handleFileUpload(e) {
                 renderGolesTable(golesData);
             }
 
-            // Persist all data
             let stored = window.dashboard_storage;
             stored.entradasData = entradasData;
             stored.salidasData = salidasData;
@@ -1074,7 +1073,7 @@ function handleFileUpload(e) {
             stored.secondData = secondData;
             stored.golesData = golesData;
             stored.altoAgingData = altoAgingData;
-            saveStateToServer();
+            await saveStateToServer();
 
             // Mostrar mensaje de éxito general después de un breve retraso
             // para no sobreescribir el mensaje de conteo de registros FAIL
