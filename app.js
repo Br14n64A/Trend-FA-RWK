@@ -795,7 +795,7 @@ function getWeekId(date = new Date()) {
 
 async function checkWeeklyReset() {
     const currentWeekId = getWeekId();
-    const APP_VERSION = "5.0";
+    const APP_VERSION = "5.6";
 
     if (!window.dashboard_storage) {
         window.dashboard_storage = { 
@@ -900,8 +900,8 @@ async function checkWeeklyReset() {
         await saveStateToServer();
     }
 
-    const weekPill = document.getElementById('currentWeekPill');
-    if (weekPill) weekPill.textContent = currentWeekId;
+    const weekPill = document.getElementById('currentWeekDisplay');
+    if (weekPill) weekPill.textContent = 'Semana Actual: ' + currentWeekId;
 }
 
 
