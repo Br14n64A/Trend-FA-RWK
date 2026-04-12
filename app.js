@@ -1294,17 +1294,21 @@ function renderGolesTable(golesData) {
         const w = parseInt(goal.wip) || 0;
         const p = parseInt(goal.pass) || 0;
         
-        const subtotal = q + r + w + p;
-        if (subtotal === 0) return;
+        // El subtotal de PRODUCCIÓN es solo RWK + WIP + PASS
+        const subProd = r + w + p;
+        if (subProd === 0 && q === 0) return;
 
-        const pPctPass = (p / subtotal) * 100;
-        if (pPctPass >= 100) return;
+        // Si subProd es 0 pero hay QA, el subtotal para el cálculo es al menos q
+        const calcBase = subProd || q;
+
+        const pPctPass = subProd > 0 ? (p / subProd) * 100 : 0;
+        if (pPctPass >= 100 && subProd > 0) return;
 
         totalQa += q; totalRwk += r; totalWip += w; totalPass += p;
 
-        const pq = ((q / subtotal) * 100).toFixed(0);
-        const pr = ((r / subtotal) * 100).toFixed(0);
-        const pw = ((w / subtotal) * 100).toFixed(0);
+        const pq = ((q / (subProd || q)) * 100).toFixed(0); // Relativo a la producción
+        const pr = subProd > 0 ? ((r / subProd) * 100).toFixed(0) : "0";
+        const pw = subProd > 0 ? ((w / subProd) * 100).toFixed(0) : "0";
         const pp = pPctPass.toFixed(0);
 
         const cq = `hsl(${Math.max(0, 140 - (parseFloat(pq) * 1.4))}, 100%, 70%)`;
@@ -1313,10 +1317,14 @@ function renderGolesTable(golesData) {
         const cp = `hsl(${Math.min(140, parseFloat(pp) * 1.4)}, 100%, 70%)`;
 
         html += `<tr>
-            <td style="text-align: left; padding-left: 10px !important;">${goal.description}</td>
-            <td>${goal.date}</td>
-            <td class="val-col">${q}</td>
-            <td class="pct-col" style="background-color: ${cq};">${pq}%</td>
+            <td style="text-align: left; padding-left: 10px !important; border-right: 2px solid #94a3b8;">${goal.description}</td>
+            <td style="border-right: 2px solid #94a3b8;">${goal.date}</td>
+            
+            <!-- SECCIÓN QA (EN UN APARTE) -->
+            <td class="val-col" style="background-color: #f8fafc !important;">${q}</td>
+            <td class="pct-col" style="background-color: ${cq}; border-right: 2px solid #94a3b8;">${pq}%</td>
+            
+            <!-- SECCIÓN PRODUCCIÓN -->
             <td class="val-col">${r}</td>
             <td class="pct-col" style="background-color: ${cr};">${pr}%</td>
             <td class="val-col">${w}</td>
@@ -1328,12 +1336,14 @@ function renderGolesTable(golesData) {
 
     body.innerHTML = html || '<tr><td colspan="10" style="text-align:center; padding: 2rem;">No hay goles con pendientes.</td></tr>';
 
-    const grandTotal = totalQa + totalRwk + totalWip + totalPass;
-    if (grandTotal > 0) {
-        const gq = ((totalQa / grandTotal) * 100).toFixed(0);
-        const gr = ((totalRwk / grandTotal) * 100).toFixed(0);
-        const gw = ((totalWip / grandTotal) * 100).toFixed(0);
-        const gp = ((totalPass / grandTotal) * 100).toFixed(0);
+    const grandProd = totalRwk + totalWip + totalPass;
+    const grandBase = grandProd || totalQa;
+
+    if (grandBase > 0) {
+        const gq = ((totalQa / grandBase) * 100).toFixed(0);
+        const gr = grandProd > 0 ? ((totalRwk / grandProd) * 100).toFixed(0) : "0";
+        const gw = grandProd > 0 ? ((totalWip / grandProd) * 100).toFixed(0) : "0";
+        const gp = grandProd > 0 ? ((totalPass / grandProd) * 100).toFixed(0) : "0";
 
         const cgq = `hsl(${Math.max(0, 140 - (parseFloat(gq) * 1.4))}, 100%, 70%)`;
         const cgr = `hsl(${Math.max(0, 140 - (parseFloat(gr) * 1.4))}, 100%, 70%)`;
@@ -1341,9 +1351,9 @@ function renderGolesTable(golesData) {
         const cgp = `hsl(${Math.min(140, parseFloat(gp) * 1.4)}, 100%, 70%)`;
 
         foot.innerHTML = `<tr class="total-row">
-            <td colspan="2" style="text-align: left; padding-left: 10px !important; font-weight: bold;">TOTAL GENERAL</td>
-            <td class="val-col">${totalQa}</td>
-            <td class="pct-col" style="background-color: ${cgq};">${gq}%</td>
+            <td colspan="2" style="text-align: left; padding-left: 10px !important; font-weight: bold; border-right: 2px solid #94a3b8;">TOTAL GENERAL</td>
+            <td class="val-col" style="background-color: #f1f5f9 !important;">${totalQa}</td>
+            <td class="pct-col" style="background-color: ${cgq}; border-right: 2px solid #94a3b8;">${gq}%</td>
             <td class="val-col">${totalRwk}</td>
             <td class="pct-col" style="background-color: ${cgr};">${gr}%</td>
             <td class="val-col">${totalWip}</td>
