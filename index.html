@@ -91,7 +91,7 @@
                         <div class="summary-table-container">
                             <table class="summary-table" id="summaryTable">
                                 <thead>
-                                    <tr>
+                                    <tr id="summaryHeader">
                                         <th>CATEGORÍA</th>
                                         <th>VIE ANT</th>
                                         <th>LUNES</th>
@@ -156,8 +156,20 @@
                                 <h3 class="card-title">Unidades en Alto Aging (>30 Días)</h3>
                                 <button id="btnDownloadAltoAging" class="btn-download" title="Descargar Excel">📥</button>
                             </div>
-                            <div class="chart-container">
+                            <div class="chart-container" style="height: 350px;">
                                 <canvas id="altoAgingChart"></canvas>
+                            </div>
+                            <!-- Tabla de desglose de Alto Aging requerida por app.js -->
+                            <div class="p-4" style="margin-top: 1rem;">
+                                <div class="table-container">
+                                    <table class="summary-table" style="font-size: 0.8rem;">
+                                        <thead>
+                                            <tr id="altoAgingTableHeader"></tr>
+                                        </thead>
+                                        <tbody id="altoAgingTableBody"></tbody>
+                                        <tfoot id="altoAgingTableFoot"></tfoot>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
