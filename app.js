@@ -1281,10 +1281,16 @@ function formatDate(excelDate) {
 function renderGolesTable(golesData) {
     const body = document.getElementById('golesBody');
     const foot = document.getElementById('golesFoot');
-    if (!body || !foot) return;
+    const qaBody = document.getElementById('qaBody');
+    const qaFoot = document.getElementById('qaFoot');
+    
+    if (!body || !foot || !qaBody || !qaFoot) return;
 
-    let html = "";
-    let totalQa = 0, totalRwk = 0, totalWip = 0, totalPass = 0;
+    let htmlProd = "";
+    let htmlQa = "";
+    
+    let totalRwk = 0, totalWip = 0, totalPass = 0, totalQa = 0;
+    let totalProd = 0;
 
     const golesList = Array.isArray(golesData) ? golesData : (golesData.goals || []);
 
@@ -1294,66 +1300,62 @@ function renderGolesTable(golesData) {
         const w = parseInt(goal.wip) || 0;
         const p = parseInt(goal.pass) || 0;
         
-        // El subtotal de PRODUCCIÓN es solo RWK + WIP + PASS
         const subProd = r + w + p;
-        if (subProd === 0 && q === 0) return;
 
-        // Si subProd es 0 pero hay QA, el subtotal para el cálculo es al menos q
-        const calcBase = subProd || q;
+        // Render Tabla 1: PRODUCCIÓN (Solo si hay RWK/WIP/PASS)
+        if (subProd > 0) {
+            const pPctPass = (p / subProd) * 100;
+            if (pPctPass < 100) {
+                totalRwk += r; totalWip += w; totalPass += p; totalProd += subProd;
 
-        const pPctPass = subProd > 0 ? (p / subProd) * 100 : 0;
-        if (pPctPass >= 100 && subProd > 0) return;
+                const pr = ((r / subProd) * 100).toFixed(0);
+                const pw = ((w / subProd) * 100).toFixed(0);
+                const pp = pPctPass.toFixed(0);
 
-        totalQa += q; totalRwk += r; totalWip += w; totalPass += p;
+                const cr = `hsl(${Math.max(0, 140 - (parseFloat(pr) * 1.4))}, 100%, 70%)`;
+                const cw = `hsl(${Math.max(0, 140 - (parseFloat(pw) * 1.4))}, 100%, 70%)`;
+                const cp = `hsl(${Math.min(140, parseFloat(pp) * 1.4)}, 100%, 70%)`;
 
-        const pq = ((q / (subProd || q)) * 100).toFixed(0); // Relativo a la producción
-        const pr = subProd > 0 ? ((r / subProd) * 100).toFixed(0) : "0";
-        const pw = subProd > 0 ? ((w / subProd) * 100).toFixed(0) : "0";
-        const pp = pPctPass.toFixed(0);
+                htmlProd += `<tr>
+                    <td style="text-align: left; padding-left: 10px !important;">${goal.description}</td>
+                    <td>${goal.date}</td>
+                    <td class="val-col">${r}</td>
+                    <td class="pct-col" style="background-color: ${cr};">${pr}%</td>
+                    <td class="val-col">${w}</td>
+                    <td class="pct-col" style="background-color: ${cw};">${pw}%</td>
+                    <td class="val-col">${p}</td>
+                    <td class="pct-col" style="background-color: ${cp};">${pp}%</td>
+                </tr>`;
+            }
+        }
 
-        const cq = `hsl(${Math.max(0, 140 - (parseFloat(pq) * 1.4))}, 100%, 70%)`;
-        const cr = `hsl(${Math.max(0, 140 - (parseFloat(pr) * 1.4))}, 100%, 70%)`;
-        const cw = `hsl(${Math.max(0, 140 - (parseFloat(pw) * 1.4))}, 100%, 70%)`;
-        const cp = `hsl(${Math.min(140, parseFloat(pp) * 1.4)}, 100%, 70%)`;
+        // Render Tabla 2: QA (Solo si hay QA)
+        if (q > 0) {
+            totalQa += q;
+            const pctQa = subProd > 0 ? ((q / subProd) * 100).toFixed(0) : "100";
+            const cq = `hsl(${Math.max(0, 140 - (parseFloat(pctQa) * 1.4))}, 100%, 70%)`;
 
-        html += `<tr>
-            <td style="text-align: left; padding-left: 10px !important; border-right: 2px solid #94a3b8;">${goal.description}</td>
-            <td style="border-right: 2px solid #94a3b8;">${goal.date}</td>
-            
-            <!-- SECCIÓN QA (EN UN APARTE) -->
-            <td class="val-col" style="background-color: #f8fafc !important;">${q}</td>
-            <td class="pct-col" style="background-color: ${cq}; border-right: 2px solid #94a3b8;">${pq}%</td>
-            
-            <!-- SECCIÓN PRODUCCIÓN -->
-            <td class="val-col">${r}</td>
-            <td class="pct-col" style="background-color: ${cr};">${pr}%</td>
-            <td class="val-col">${w}</td>
-            <td class="pct-col" style="background-color: ${cw};">${pw}%</td>
-            <td class="val-col">${p}</td>
-            <td class="pct-col" style="background-color: ${cp};">${pp}%</td>
-        </tr>`;
+            htmlQa += `<tr>
+                <td style="text-align: left; padding-left: 10px !important;">${goal.description}</td>
+                <td>${goal.date}</td>
+                <td class="val-col" style="background-color: #ffffff !important;">${q}</td>
+                <td class="pct-col" style="background-color: ${cq};">${pctQa}%</td>
+            </tr>`;
+        }
     });
 
-    body.innerHTML = html || '<tr><td colspan="10" style="text-align:center; padding: 2rem;">No hay goles con pendientes.</td></tr>';
-
-    const grandProd = totalRwk + totalWip + totalPass;
-    const grandBase = grandProd || totalQa;
-
-    if (grandBase > 0) {
-        const gq = ((totalQa / grandBase) * 100).toFixed(0);
-        const gr = grandProd > 0 ? ((totalRwk / grandProd) * 100).toFixed(0) : "0";
-        const gw = grandProd > 0 ? ((totalWip / grandProd) * 100).toFixed(0) : "0";
-        const gp = grandProd > 0 ? ((totalPass / grandProd) * 100).toFixed(0) : "0";
-
-        const cgq = `hsl(${Math.max(0, 140 - (parseFloat(gq) * 1.4))}, 100%, 70%)`;
+    // Finalizar Tabla 1
+    body.innerHTML = htmlProd || '<tr><td colspan="8" style="text-align:center; padding: 2rem;">No hay goles de producción pendientes.</td></tr>';
+    if (totalProd > 0) {
+        const gr = ((totalRwk / totalProd) * 100).toFixed(0);
+        const gw = ((totalWip / totalProd) * 100).toFixed(0);
+        const gp = ((totalPass / totalProd) * 100).toFixed(0);
         const cgr = `hsl(${Math.max(0, 140 - (parseFloat(gr) * 1.4))}, 100%, 70%)`;
         const cgw = `hsl(${Math.max(0, 140 - (parseFloat(gw) * 1.4))}, 100%, 70%)`;
         const cgp = `hsl(${Math.min(140, parseFloat(gp) * 1.4)}, 100%, 70%)`;
 
         foot.innerHTML = `<tr class="total-row">
-            <td colspan="2" style="text-align: left; padding-left: 10px !important; font-weight: bold; border-right: 2px solid #94a3b8;">TOTAL GENERAL</td>
-            <td class="val-col" style="background-color: #f1f5f9 !important;">${totalQa}</td>
-            <td class="pct-col" style="background-color: ${cgq}; border-right: 2px solid #94a3b8;">${gq}%</td>
+            <td colspan="2" style="text-align: left; padding-left: 10px; font-weight: bold;">TOTAL PRODUCCIÓN</td>
             <td class="val-col">${totalRwk}</td>
             <td class="pct-col" style="background-color: ${cgr};">${gr}%</td>
             <td class="val-col">${totalWip}</td>
@@ -1361,9 +1363,20 @@ function renderGolesTable(golesData) {
             <td class="val-col">${totalPass}</td>
             <td class="pct-col" style="background-color: ${cgp};">${gp}%</td>
         </tr>`;
-    } else {
-        foot.innerHTML = "";
-    }
+    } else foot.innerHTML = "";
+
+    // Finalizar Tabla 2
+    qaBody.innerHTML = htmlQa || '<tr><td colspan="4" style="text-align:center; padding: 2rem;">No hay inspecciones QA registradas.</td></tr>';
+    if (totalQa > 0) {
+        const gpq = totalProd > 0 ? ((totalQa / totalProd) * 100).toFixed(0) : "100";
+        const cgq = `hsl(${Math.max(0, 140 - (parseFloat(gpq) * 1.4))}, 100%, 70%)`;
+
+        qaFoot.innerHTML = `<tr class="total-row">
+            <td colspan="2" style="text-align: left; padding-left: 10px; font-weight: bold;">TOTAL QA</td>
+            <td class="val-col" style="background-color: #ffffff !important; color: #000000 !important;">${totalQa}</td>
+            <td class="pct-col" style="background-color: ${cgq};">${gpq}%</td>
+        </tr>`;
+    } else qaFoot.innerHTML = "";
 }
 
 function processData() {
