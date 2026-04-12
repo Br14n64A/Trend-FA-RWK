@@ -485,9 +485,14 @@ tr:hover td {
     background: #94a3b8;
 }
 
+.goles-table .th-qa {
+    background: #38bdf8;
+    color: #ffffff;
+}
+
 .goles-table .th-rwk {
     background: #b91c1c;
-    color: #000000;
+    color: #ffffff;
 }
 
 .goles-table .th-wip {
@@ -521,7 +526,8 @@ tr:hover td {
 }
 
 .goles-table .val-col {
-    background: #0f172a;
+    background: #ffffff;
+    color: #1e293b;
     border-right: 1px solid var(--glass-border);
 }
 

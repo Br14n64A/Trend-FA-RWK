@@ -1228,6 +1228,7 @@ function processGoles(rows) {
                 id: goalId,
                 description: goalId,
                 date: 'N/A',
+                qaInspRwk: 0,
                 rwk: 0,
                 wip: 0,
                 pass: 0
@@ -1237,6 +1238,11 @@ function processGoles(rows) {
         // Take date from Column E (index 4) - Update if we find a valid date
         if (golesMap[goalId].date === 'N/A' && row[4]) {
             golesMap[goalId].date = formatDate(row[4]);
+        }
+
+        // Logic for QA INSP RWK (Column F - Index 5)
+        if (row[5] && String(row[5]).trim() !== "" && String(row[5]).trim().toUpperCase() !== "N/A") {
+            golesMap[goalId].qaInspRwk++;
         }
 
         const catLower = category.toLowerCase();
@@ -1272,10 +1278,10 @@ function renderGolesTable(golesData) {
     if (!body || !foot) return;
 
     let html = "";
-    let totalRwk = 0, totalWip = 0, totalPass = 0;
+    let totalQa = 0, totalRwk = 0, totalWip = 0, totalPass = 0;
 
     golesData.forEach(goal => {
-        const subtotal = goal.rwk + goal.wip + goal.pass;
+        const subtotal = (goal.qaInspRwk || 0) + goal.rwk + goal.wip + goal.pass;
         if (subtotal === 0) return;
 
         const pctPassVal = (goal.pass / subtotal) * 100;
@@ -1284,14 +1290,17 @@ function renderGolesTable(golesData) {
         if (pctPassVal >= 100) return;
 
         // Sumar a los totales solo los que se van a mostrar (menos del 100% PASS)
+        totalQa += (goal.qaInspRwk || 0);
         totalRwk += goal.rwk;
         totalWip += goal.wip;
         totalPass += goal.pass;
 
+        const pctQa = (((goal.qaInspRwk || 0) / subtotal) * 100).toFixed(0);
         const pctRwk = ((goal.rwk / subtotal) * 100).toFixed(0);
         const pctWip = ((goal.wip / subtotal) * 100).toFixed(0);
         const pctPass = pctPassVal.toFixed(0);
 
+        const colorQa = `hsl(${Math.max(0, 140 - (parseFloat(pctQa) * 1.4))}, 100%, 70%)`;
         const colorRwk = `hsl(${Math.max(0, 140 - (parseFloat(pctRwk) * 1.4))}, 100%, 70%)`;
         const colorWip = `hsl(${Math.max(0, 140 - (parseFloat(pctWip) * 1.4))}, 100%, 70%)`;
         const colorPass = `hsl(${Math.min(140, parseFloat(pctPass) * 1.4)}, 100%, 70%)`;
@@ -1299,6 +1308,8 @@ function renderGolesTable(golesData) {
         html += `<tr>
             <td data-label="DESCRIPCIÓN">${goal.description}</td>
             <td data-label="FECHA">${goal.date}</td>
+            <td class="val-col" data-label="QA INSP RWK">${goal.qaInspRwk || 0}</td>
+            <td class="pct-col" data-label="QA %" style="background-color: ${colorQa}; color: #1e293b; font-weight: 700;">${pctQa}%</td>
             <td class="val-col" data-label="RWK">${goal.rwk}</td>
             <td class="pct-col" data-label="RWK %" style="background-color: ${colorRwk}; color: #1e293b; font-weight: 700;">${pctRwk}%</td>
             <td class="val-col" data-label="WIP">${goal.wip}</td>
@@ -1308,20 +1319,24 @@ function renderGolesTable(golesData) {
         </tr>`;
     });
 
-    body.innerHTML = html || '<tr><td colspan="8" style="text-align:center; padding: 2rem;">No hay goles con pendientes (todos están al 100% PASS).</td></tr>';
+    body.innerHTML = html || '<tr><td colspan="10" style="text-align:center; padding: 2rem;">No hay goles con pendientes (todos están al 100% PASS).</td></tr>';
 
-    const grandTotal = totalRwk + totalWip + totalPass;
+    const grandTotal = totalQa + totalRwk + totalWip + totalPass;
     if (grandTotal > 0) {
+        const gPctQa = ((totalQa / grandTotal) * 100).toFixed(0);
         const gPctRwk = ((totalRwk / grandTotal) * 100).toFixed(0);
         const gPctWip = ((totalWip / grandTotal) * 100).toFixed(0);
         const gPctPass = ((totalPass / grandTotal) * 100).toFixed(0);
 
+        const colorGQa = `hsl(${Math.max(0, 140 - (parseFloat(gPctQa) * 1.4))}, 100%, 70%)`;
         const colorGRwk = `hsl(${Math.max(0, 140 - (parseFloat(gPctRwk) * 1.4))}, 100%, 70%)`;
         const colorGWip = `hsl(${Math.max(0, 140 - (parseFloat(gPctWip) * 1.4))}, 100%, 70%)`;
         const colorGPass = `hsl(${Math.min(140, parseFloat(gPctPass) * 1.4)}, 100%, 70%)`;
 
         foot.innerHTML = `<tr class="total-row">
             <td colspan="2" data-label="TOTAL GENERAL">Total General (Producción Total)</td>
+            <td class="val-col" data-label="QA INSP RWK">${totalQa}</td>
+            <td class="pct-col" data-label="QA %" style="background-color: ${colorGQa}; color: #1e293b; font-weight: 800;">${gPctQa}%</td>
             <td class="val-col" data-label="RWK">${totalRwk}</td>
             <td class="pct-col" data-label="RWK %" style="background-color: ${colorGRwk}; color: #1e293b; font-weight: 800;">${gPctRwk}%</td>
             <td class="val-col" data-label="WIP">${totalWip}</td>
