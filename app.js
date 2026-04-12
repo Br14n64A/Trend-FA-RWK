@@ -1217,9 +1217,14 @@ function processGoles(rows) {
     data.forEach((row, index) => {
         if (!row || row.length < 2) return;
 
-        // Based on image: B (index 1) is "Descri" (Agrupador), D (index 3) is "Resumen" (Status)
+        // B (index 1) is "Descri" (Agrupador)
+        // D (index 3) is "Resumen" (Status for RWK, WIP, PASS)
+        // E (index 4) is "Fecha"
+        // F (index 5) is the specific QA INSP RWK column
+        
         const goalId = String(row[1] || '').trim();
-        const category = String(row[3] || '').trim().toUpperCase();
+        const categoryD = String(row[3] || '').trim().toUpperCase();
+        const valueF = String(row[5] || '').trim().toUpperCase();
 
         if (!goalId || goalId.toLowerCase() === 'descri') return;
 
@@ -1235,25 +1240,26 @@ function processGoles(rows) {
             };
         }
 
-        // Take date from Column E (index 4) - Update if we find a valid date
+        // Fecha de Columna E
         if (golesMap[goalId].date === 'N/A' && row[4]) {
             golesMap[goalId].date = formatDate(row[4]);
         }
 
-        // Logic for QA INSP RWK (Column F - Index 5)
-        if (row[5] && String(row[5]).trim() !== "" && String(row[5]).trim().toUpperCase() !== "N/A") {
+        // NUEVA LÓGICA: Preguntar si Columna F contiene específicamente "QA INSP RWK"
+        if (valueF.includes("QA INSP RWK")) {
             golesMap[goalId].qaInspRwk++;
         }
 
-        const catLower = category.toLowerCase();
-        if (catLower.includes("rwk") || catLower.includes("fail") || catLower.includes("rework") || catLower.includes("rkw") || catLower.includes("fll")) {
+        // Lógica estándar para RWK, WIP, PASS basada en Columna D
+        const catD = categoryD.toLowerCase();
+        if (catD.includes("rwk") || catD.includes("fail") || catD.includes("rework") || catD.includes("rkw") || catD.includes("fll")) {
             golesMap[goalId].rwk++;
-        } else if (catLower.includes("wip") || catLower.includes("process") || catLower.includes("wait") || catLower.includes("test") || catLower.includes("open") || catLower.includes("prog")) {
+        } else if (catD.includes("wip") || catD.includes("process") || catD.includes("wait") || catD.includes("test") || catD.includes("open") || catD.includes("prog")) {
             golesMap[goalId].wip++;
-        } else if (catLower.includes("pass") || catLower.includes("ok") || catLower.includes("done") || catLower.includes("ship") || catLower.includes("complete")) {
+        } else if (catD.includes("pass") || catD.includes("ok") || catD.includes("done") || catD.includes("ship") || catD.includes("complete")) {
             golesMap[goalId].pass++;
         } else {
-            // Default to WIP if unknown but row exists
+            // Si hay algo en la fila pero no coincide, lo contamos como WIP por defecto
             golesMap[goalId].wip++;
         }
         
@@ -1280,69 +1286,70 @@ function renderGolesTable(golesData) {
     let html = "";
     let totalQa = 0, totalRwk = 0, totalWip = 0, totalPass = 0;
 
-    golesData.forEach(goal => {
-        const subtotal = (goal.qaInspRwk || 0) + goal.rwk + goal.wip + goal.pass;
+    const golesList = Array.isArray(golesData) ? golesData : (golesData.goals || []);
+
+    golesList.forEach(goal => {
+        const q = parseInt(goal.qaInspRwk) || 0;
+        const r = parseInt(goal.rwk) || 0;
+        const w = parseInt(goal.wip) || 0;
+        const p = parseInt(goal.pass) || 0;
+        
+        const subtotal = q + r + w + p;
         if (subtotal === 0) return;
 
-        const pctPassVal = (goal.pass / subtotal) * 100;
+        const pPctPass = (p / subtotal) * 100;
+        if (pPctPass >= 100) return;
 
-        // Filtrar para que solamente se vean en pantalla los goles con menos del 100% PASS
-        if (pctPassVal >= 100) return;
+        totalQa += q; totalRwk += r; totalWip += w; totalPass += p;
 
-        // Sumar a los totales solo los que se van a mostrar (menos del 100% PASS)
-        totalQa += (goal.qaInspRwk || 0);
-        totalRwk += goal.rwk;
-        totalWip += goal.wip;
-        totalPass += goal.pass;
+        const pq = ((q / subtotal) * 100).toFixed(0);
+        const pr = ((r / subtotal) * 100).toFixed(0);
+        const pw = ((w / subtotal) * 100).toFixed(0);
+        const pp = pPctPass.toFixed(0);
 
-        const pctQa = (((goal.qaInspRwk || 0) / subtotal) * 100).toFixed(0);
-        const pctRwk = ((goal.rwk / subtotal) * 100).toFixed(0);
-        const pctWip = ((goal.wip / subtotal) * 100).toFixed(0);
-        const pctPass = pctPassVal.toFixed(0);
-
-        const colorQa = `hsl(${Math.max(0, 140 - (parseFloat(pctQa) * 1.4))}, 100%, 70%)`;
-        const colorRwk = `hsl(${Math.max(0, 140 - (parseFloat(pctRwk) * 1.4))}, 100%, 70%)`;
-        const colorWip = `hsl(${Math.max(0, 140 - (parseFloat(pctWip) * 1.4))}, 100%, 70%)`;
-        const colorPass = `hsl(${Math.min(140, parseFloat(pctPass) * 1.4)}, 100%, 70%)`;
+        const cq = `hsl(${Math.max(0, 140 - (parseFloat(pq) * 1.4))}, 100%, 70%)`;
+        const cr = `hsl(${Math.max(0, 140 - (parseFloat(pr) * 1.4))}, 100%, 70%)`;
+        const cw = `hsl(${Math.max(0, 140 - (parseFloat(pw) * 1.4))}, 100%, 70%)`;
+        const cp = `hsl(${Math.min(140, parseFloat(pp) * 1.4)}, 100%, 70%)`;
 
         html += `<tr>
-            <td data-label="DESCRIPCIÓN">${goal.description}</td>
-            <td data-label="FECHA">${goal.date}</td>
-            <td class="val-col" data-label="QA INSP RWK">${goal.qaInspRwk || 0}</td>
-            <td class="pct-col" data-label="QA %" style="background-color: ${colorQa}; color: #1e293b; font-weight: 700;">${pctQa}%</td>
-            <td class="val-col" data-label="RWK">${goal.rwk}</td>
-            <td class="pct-col" data-label="RWK %" style="background-color: ${colorRwk}; color: #1e293b; font-weight: 700;">${pctRwk}%</td>
-            <td class="val-col" data-label="WIP">${goal.wip}</td>
-            <td class="pct-col" data-label="WIP %" style="background-color: ${colorWip}; color: #1e293b; font-weight: 700;">${pctWip}%</td>
-            <td class="val-col" data-label="PASS">${goal.pass}</td>
-            <td class="pct-col" data-label="PASS %" style="background-color: ${colorPass}; color: #1e293b; font-weight: 700;">${pctPass}%</td>
+            <td style="text-align: left; padding-left: 10px !important;">${goal.description}</td>
+            <td>${goal.date}</td>
+            <td class="val-col">${q}</td>
+            <td class="pct-col" style="background-color: ${cq};">${pq}%</td>
+            <td class="val-col">${r}</td>
+            <td class="pct-col" style="background-color: ${cr};">${pr}%</td>
+            <td class="val-col">${w}</td>
+            <td class="pct-col" style="background-color: ${cw};">${pw}%</td>
+            <td class="val-col">${p}</td>
+            <td class="pct-col" style="background-color: ${cp};">${pp}%</td>
         </tr>`;
     });
 
-    body.innerHTML = html || '<tr><td colspan="10" style="text-align:center; padding: 2rem;">No hay goles con pendientes (todos están al 100% PASS).</td></tr>';
+    body.innerHTML = html || '<tr><td colspan="10" style="text-align:center; padding: 2rem;">No hay goles con pendientes.</td></tr>';
 
     const grandTotal = totalQa + totalRwk + totalWip + totalPass;
     if (grandTotal > 0) {
-        const gPctQa = ((totalQa / grandTotal) * 100).toFixed(0);
-        const gPctRwk = ((totalRwk / grandTotal) * 100).toFixed(0);
-        const gPctWip = ((totalWip / grandTotal) * 100).toFixed(0);
-        const gPctPass = ((totalPass / grandTotal) * 100).toFixed(0);
+        const gq = ((totalQa / grandTotal) * 100).toFixed(0);
+        const gr = ((totalRwk / grandTotal) * 100).toFixed(0);
+        const gw = ((totalWip / grandTotal) * 100).toFixed(0);
+        const gp = ((totalPass / grandTotal) * 100).toFixed(0);
 
-        const colorGQa = `hsl(${Math.max(0, 140 - (parseFloat(gPctQa) * 1.4))}, 100%, 70%)`;
-        const colorGRwk = `hsl(${Math.max(0, 140 - (parseFloat(gPctRwk) * 1.4))}, 100%, 70%)`;
-        const colorGWip = `hsl(${Math.max(0, 140 - (parseFloat(gPctWip) * 1.4))}, 100%, 70%)`;
-        const colorGPass = `hsl(${Math.min(140, parseFloat(gPctPass) * 1.4)}, 100%, 70%)`;
+        const cgq = `hsl(${Math.max(0, 140 - (parseFloat(gq) * 1.4))}, 100%, 70%)`;
+        const cgr = `hsl(${Math.max(0, 140 - (parseFloat(gr) * 1.4))}, 100%, 70%)`;
+        const cgw = `hsl(${Math.max(0, 140 - (parseFloat(gw) * 1.4))}, 100%, 70%)`;
+        const cgp = `hsl(${Math.min(140, parseFloat(gp) * 1.4)}, 100%, 70%)`;
 
         foot.innerHTML = `<tr class="total-row">
-            <td colspan="2" data-label="TOTAL GENERAL">Total General (Producción Total)</td>
-            <td class="val-col" data-label="QA INSP RWK">${totalQa}</td>
-            <td class="pct-col" data-label="QA %" style="background-color: ${colorGQa}; color: #1e293b; font-weight: 800;">${gPctQa}%</td>
-            <td class="val-col" data-label="RWK">${totalRwk}</td>
-            <td class="pct-col" data-label="RWK %" style="background-color: ${colorGRwk}; color: #1e293b; font-weight: 800;">${gPctRwk}%</td>
-            <td class="val-col" data-label="WIP">${totalWip}</td>
-            <td class="pct-col" data-label="WIP %" style="background-color: ${colorGWip}; color: #1e293b; font-weight: 800;">${gPctWip}%</td>
-            <td class="val-col" data-label="PASS">${totalPass}</td>
-            <td class="pct-col" data-label="PASS %" style="background-color: ${colorGPass}; color: #1e293b; font-weight: 800;">${gPctPass}%</td>
+            <td colspan="2" style="text-align: left; padding-left: 10px !important; font-weight: bold;">TOTAL GENERAL</td>
+            <td class="val-col">${totalQa}</td>
+            <td class="pct-col" style="background-color: ${cgq};">${gq}%</td>
+            <td class="val-col">${totalRwk}</td>
+            <td class="pct-col" style="background-color: ${cgr};">${gr}%</td>
+            <td class="val-col">${totalWip}</td>
+            <td class="pct-col" style="background-color: ${cgw};">${gw}%</td>
+            <td class="val-col">${totalPass}</td>
+            <td class="pct-col" style="background-color: ${cgp};">${gp}%</td>
         </tr>`;
     } else {
         foot.innerHTML = "";
