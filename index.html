@@ -15,56 +15,53 @@
 </head>
 
 <body>
+    <div class="background-decor blur-1"></div>
+    <div class="background-decor blur-2"></div>
+
     <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="logo-container">
-                <div class="logo-icon">📊</div>
-                <div class="logo-text">PCBA<span>Dashboard</span></div>
+        <header>
+            <div class="logo">
+                <img src="logo_ingrasys.png" alt="Ingrasys Logo" class="logo-img">
             </div>
-            <nav class="nav-menu">
+            
+            <nav class="view-nav">
                 <button id="btnSummary" class="nav-btn active">
                     <span class="btn-icon">🏠</span>
-                    <span class="btn-text">Resumen Semanal</span>
+                    <span class="btn-text">Resumen</span>
                 </button>
                 <button id="btnDashboard" class="nav-btn">
                     <span class="btn-icon">📈</span>
-                    <span class="btn-text">Gráficos de Tendencia</span>
+                    <span class="btn-text">Gráficos</span>
                 </button>
                 <button id="btnGoles" class="nav-btn">
                     <span class="btn-icon">⚽</span>
-                    <span class="btn-text">Seguimiento de Goles</span>
+                    <span class="btn-text">Goles</span>
                 </button>
                 <button id="btnHistory" class="nav-btn">
                     <span class="btn-icon">📜</span>
-                    <span class="btn-text">Historial Semanal</span>
+                    <span class="btn-text">Historial</span>
                 </button>
             </nav>
-            <div class="sidebar-footer">
-                <div class="status-indicator">
-                    <span class="status-dot green"></span>
-                    <span id="serverStatusText">Servidor Activo</span>
-                </div>
-            </div>
-        </aside>
 
-        <!-- Main Content Area -->
+            <div class="header-actions">
+                <div class="file-status" id="fileStatusBadge">
+                    <div class="pulse"></div>
+                    <span id="statusText">Cargando...</span>
+                </div>
+                
+                <label for="fileUpload" class="upload-btn" title="Cargar Datos Excel">
+                    <span class="btn-icon">📁</span>
+                    <span class="btn-text">Cargar Input Global</span>
+                </label>
+                <input type="file" id="fileUpload" style="display: none;" accept=".xlsx, .xls">
+            </div>
+        </header>
+
         <main class="main-content">
-            <header class="top-bar">
-                <div class="top-bar-left">
-                    <h1 id="viewTitle">Resumen de Producción</h1>
-                    <p id="currentWeekDisplay" class="week-badge">Semana Actual: Cargando...</p>
-                </div>
-                <div class="top-bar-right">
-                    <div class="file-input-wrapper">
-                        <label for="fileUpload" class="custom-file-btn">
-                            <span class="btn-icon">📁</span>
-                            <span class="btn-text">Cargar Input Global</span>
-                        </label>
-                        <input type="file" id="fileUpload" accept=".xlsx, .xls">
-                    </div>
-                </div>
-            </header>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h1 id="viewTitle" style="font-size: 1.5rem; font-weight: 700;">Resumen de Producción</h1>
+                <div id="currentWeekDisplay" class="pill" style="font-size: 0.9rem;">Semana Actual: Cargando...</div>
+            </div>
 
             <div class="content-scrollable">
                 <div id="appStatus" class="app-status"></div>
