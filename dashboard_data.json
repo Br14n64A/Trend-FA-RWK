@@ -1,6 +1,6 @@
 {
   "version": "5.6",
-  "weekId": "2026-W13",
+  "weekId": "2026-W16",
   "data": {
     "MB": { "LUNES": 1, "MARTES": 1, "MIERCOLES": 1, "JUEVES": 1, "VIERNES": 0 },
     "NOGA": { "LUNES": 187, "MARTES": 199, "MIERCOLES": 206, "JUEVES": 219, "VIERNES": 0 },
@@ -14,14 +14,14 @@
   },
   "prevFridayData": {
     "MB": { "count": 1, "trend": "trend-equal" },
-    "NOGA": { "count": 169, "trend": "trend-up" },
-    "JUPITER": { "count": 78, "trend": "trend-up" },
-    "CORDITE": { "count": 35, "trend": "trend-down" },
-    "UPDB": { "count": 36, "trend": "trend-up" },
-    "MIDPLANE": { "count": 17, "trend": "trend-down" },
-    "UC Module": { "count": 16, "trend": "trend-equal" },
-    "RISER": { "count": 27, "trend": "trend-up" },
-    "SSD": { "count": 64, "trend": "trend-down" }
+    "NOGA": { "count": 201, "trend": "trend-up" },
+    "JUPITER": { "count": 123, "trend": "trend-down" },
+    "CORDITE": { "count": 38, "trend": "trend-up" },
+    "UPDB": { "count": 249, "trend": "trend-down" },
+    "MIDPLANE": { "count": 15, "trend": "trend-equal" },
+    "RISER": { "count": 39, "trend": "trend-down" },
+    "SSD": { "count": 68, "trend": "trend-up" },
+    "UC Module": { "count": 16, "trend": "trend-equal" }
   },
   "history": [],
   "stats": { "total": 461, "filtered": 461 }
