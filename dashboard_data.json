@@ -2,15 +2,15 @@
   "version": "5.6",
   "weekId": "2026-W16",
   "data": {
-    "MB": { "LUNES": 1, "MARTES": 1, "MIERCOLES": 1, "JUEVES": 1, "VIERNES": 0 },
-    "NOGA": { "LUNES": 187, "MARTES": 199, "MIERCOLES": 206, "JUEVES": 219, "VIERNES": 0 },
-    "JUPITER": { "LUNES": 101, "MARTES": 133, "MIERCOLES": 115, "JUEVES": 114, "VIERNES": 0 },
-    "CORDITE": { "LUNES": 39, "MARTES": 36, "MIERCOLES": 35, "JUEVES": 32, "VIERNES": 0 },
-    "UPDB": { "LUNES": 77, "MARTES": 67, "MIERCOLES": 102, "JUEVES": 26, "VIERNES": 0 },
-    "MIDPLANE": { "LUNES": 14, "MARTES": 14, "MIERCOLES": 13, "JUEVES": 14, "VIERNES": 0 },
-    "UC Module": { "LUNES": 16, "MARTES": 16, "MIERCOLES": 16, "JUEVES": 16, "VIERNES": 0 },
-    "RISER": { "LUNES": 34, "MARTES": 34, "MIERCOLES": 35, "JUEVES": 43, "VIERNES": 0 },
-    "SSD": { "LUNES": 63, "MARTES": 62, "MIERCOLES": 62, "JUEVES": 62, "VIERNES": 0 }
+    "MB": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "NOGA": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "JUPITER": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "CORDITE": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "UPDB": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "MIDPLANE": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "UC Module": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "RISER": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "SSD": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 }
   },
   "prevFridayData": {
     "MB": { "count": 1, "trend": "trend-equal" },
@@ -24,5 +24,5 @@
     "UC Module": { "count": 16, "trend": "trend-equal" }
   },
   "history": [],
-  "stats": { "total": 461, "filtered": 461 }
+  "stats": { "total": 0, "filtered": 0 }
 }

@@ -2939,31 +2939,39 @@ async function exportToExcel() {
 
         // --- SHEET 3: GOLES ---
         const sheet3 = workbook.addWorksheet('GOLES');
-        sheet3.addRow(['Descripción', 'Fecha', 'RWK Cant', 'RWK %', 'WIP Cant', 'WIP %', 'PASS Cant', 'PASS %']);
+        sheet3.addRow(['Descripción', 'Fecha', 'QA Cant', 'QA %', 'RWK Cant', 'RWK %', 'WIP Cant', 'WIP %', 'PASS Cant', 'PASS %']);
         const gHeader = sheet3.getRow(1);
         gHeader.font = { bold: true, color: { argb: 'FF1E293B' } };
         gHeader.alignment = { vertical: 'middle', horizontal: 'center' };
-        gHeader.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF94A3B8' } };
-        gHeader.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF94A3B8' } };
-        gHeader.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB91C1C' }, color: { argb: 'FFFFFFFF' } };
-        gHeader.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB91C1C' }, color: { argb: 'FFFFFFFF' } };
-        gHeader.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAB308' } };
-        gHeader.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAB308' } };
-        gHeader.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF15803D' }, color: { argb: 'FFFFFFFF' } };
-        gHeader.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF15803D' }, color: { argb: 'FFFFFFFF' } };
+        
+        // Colores de encabezado
+        gHeader.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF94A3B8' } }; // Desc
+        gHeader.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF94A3B8' } }; // Fecha
+        gHeader.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF38BDF8' }, color: { argb: 'FFFFFFFF' } }; // QA
+        gHeader.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF38BDF8' }, color: { argb: 'FFFFFFFF' } }; // QA%
+        gHeader.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB91C1C' }, color: { argb: 'FFFFFFFF' } }; // RWK
+        gHeader.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB91C1C' }, color: { argb: 'FFFFFFFF' } }; // RWK%
+        gHeader.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAB308' } }; // WIP
+        gHeader.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAB308' } }; // WIP%
+        gHeader.getCell(9).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF15803D' }, color: { argb: 'FFFFFFFF' } }; // PASS
+        gHeader.getCell(10).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF15803D' }, color: { argb: 'FFFFFFFF' } }; // PASS%
 
-        if (stored.golesData) {
-            let tRwk = 0, tWip = 0, tPass = 0;
-            stored.golesData.forEach(g => {
-                const total = g.rwk + g.wip + g.pass;
-                if (total === 0) return;
+        if (stored.golesData && (stored.golesData.goals || Array.isArray(stored.golesData))) {
+            const golesList = stored.golesData.goals || stored.golesData;
+            let tQa = 0, tRwk = 0, tWip = 0, tPass = 0;
 
-                const pRwk = (g.rwk / total) * 100;
-                const pWip = (g.wip / total) * 100;
-                const pPass = (g.pass / total) * 100;
+            golesList.forEach(g => {
+                const subtotal = (g.qaInspRwk || 0) + g.rwk + g.wip + g.pass;
+                if (subtotal === 0) return;
+
+                const pQa = ((g.qaInspRwk || 0) / subtotal) * 100;
+                const pRwk = (g.rwk / subtotal) * 100;
+                const pWip = (g.wip / subtotal) * 100;
+                const pPass = (g.pass / subtotal) * 100;
 
                 const row = sheet3.addRow([
                     g.description, g.date,
+                    (g.qaInspRwk || 0), `${pQa.toFixed(0)}%`,
                     g.rwk, `${pRwk.toFixed(0)}%`,
                     g.wip, `${pWip.toFixed(0)}%`,
                     g.pass, `${pPass.toFixed(0)}%`
@@ -2971,30 +2979,36 @@ async function exportToExcel() {
                 row.alignment = { vertical: 'middle', horizontal: 'center' };
                 row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
 
-                // HSL to HEX for percentages
-                applyHslStyle(row.getCell(4), Math.max(0, 140 - (pRwk * 1.4)));
-                applyHslStyle(row.getCell(6), Math.max(0, 140 - (pWip * 1.4)));
-                applyHslStyle(row.getCell(8), Math.min(140, pPass * 1.4));
+                // HSL for percentages
+                applyHslStyle(row.getCell(4), Math.max(0, 140 - (pQa * 1.4)));
+                applyHslStyle(row.getCell(6), Math.max(0, 140 - (pRwk * 1.4)));
+                applyHslStyle(row.getCell(8), Math.max(0, 140 - (pWip * 1.4)));
+                applyHslStyle(row.getCell(10), Math.min(140, pPass * 1.4));
 
-                tRwk += g.rwk; tWip += g.wip; tPass += g.pass;
+                tQa += (g.qaInspRwk || 0); tRwk += g.rwk; tWip += g.wip; tPass += g.pass;
             });
 
-            const gTotal = tRwk + tWip + tPass;
+            const gTotal = tQa + tRwk + tWip + tPass;
             if (gTotal > 0) {
+                const gpQa = (tQa / gTotal) * 100;
                 const gpRwk = (tRwk / gTotal) * 100;
                 const gpWip = (tWip / gTotal) * 100;
                 const gpPass = (tPass / gTotal) * 100;
-                const fRow = sheet3.addRow(['TOTAL', '', tRwk, `${gpRwk.toFixed(0)}%`, tWip, `${gpWip.toFixed(0)}%`, tPass, `${gpPass.toFixed(0)}%`]);
+
+                const fRow = sheet3.addRow(['TOTAL', '', tQa, `${gpQa.toFixed(0)}%`, tRwk, `${gpRwk.toFixed(0)}%`, tWip, `${gpWip.toFixed(0)}%`, tPass, `${gpPass.toFixed(0)}%`]);
                 fRow.font = { bold: true };
                 fRow.eachCell(c => c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF94A3B8' } });
-                applyHslStyle(fRow.getCell(4), Math.max(0, 140 - (gpRwk * 1.4)));
-                applyHslStyle(fRow.getCell(6), Math.max(0, 140 - (gpWip * 1.4)));
-                applyHslStyle(fRow.getCell(8), Math.min(140, gpPass * 1.4));
+                
+                applyHslStyle(fRow.getCell(4), Math.max(0, 140 - (gpQa * 1.4)));
+                applyHslStyle(fRow.getCell(6), Math.max(0, 140 - (gpRwk * 1.4)));
+                applyHslStyle(fRow.getCell(8), Math.max(0, 140 - (gpWip * 1.4)));
+                applyHslStyle(fRow.getCell(10), Math.min(140, gpPass * 1.4));
             }
         }
 
         sheet3.getColumn(1).width = 40;
         sheet3.getColumn(2).width = 15;
+        for (let i = 3; i <= 10; i++) sheet3.getColumn(i).width = 12;
 
         // Download
         const buffer = await workbook.xlsx.writeBuffer();
