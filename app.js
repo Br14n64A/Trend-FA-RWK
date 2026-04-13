@@ -1217,56 +1217,53 @@ function processGoles(rows) {
     data.forEach((row, index) => {
         if (!row || row.length < 2) return;
 
-        // B (index 1) is "Descri" (Agrupador)
-        // D (index 3) is "Resumen" (Status for RWK, WIP, PASS)
+        // B (index 1) is "Descri" (Modelo)
         // E (index 4) is "Fecha"
         // F (index 5) is the specific QA INSP RWK column
         
         const goalId = String(row[1] || '').trim();
-        const categoryD = String(row[3] || '').trim().toUpperCase();
-        const valueF = String(row[5] || '').trim().toUpperCase();
+        const valueF = String(row[5] || '').trim();
+        const valueF_UPPER = valueF.toUpperCase();
 
-        if (!goalId || goalId.toLowerCase() === 'descri') return;
+        if (!goalId || goalId.toLowerCase() === 'descri' || goalId.toLowerCase() === 'modelo') return;
 
         if (!golesMap[goalId]) {
             golesMap[goalId] = {
                 id: goalId,
                 description: goalId,
                 date: 'N/A',
+                total: 0,
                 qaInspRwk: 0,
-                rwk: 0,
-                wip: 0,
-                pass: 0
+                hasDataInF: false
             };
         }
+
+        golesMap[goalId].total++;
 
         // Fecha de Columna E
         if (golesMap[goalId].date === 'N/A' && row[4]) {
             golesMap[goalId].date = formatDate(row[4]);
         }
 
-        // NUEVA LÓGICA: Preguntar si Columna F contiene específicamente "QA INSP RWK"
-        if (valueF.includes("QA INSP RWK")) {
-            golesMap[goalId].qaInspRwk++;
-        }
-
-        // Lógica estándar para RWK, WIP, PASS basada en Columna D
-        const catD = categoryD.toLowerCase();
-        if (catD.includes("rwk") || catD.includes("fail") || catD.includes("rework") || catD.includes("rkw") || catD.includes("fll")) {
-            golesMap[goalId].rwk++;
-        } else if (catD.includes("wip") || catD.includes("process") || catD.includes("wait") || catD.includes("test") || catD.includes("open") || catD.includes("prog")) {
-            golesMap[goalId].wip++;
-        } else if (catD.includes("pass") || catD.includes("ok") || catD.includes("done") || catD.includes("ship") || catD.includes("complete")) {
-            golesMap[goalId].pass++;
-        } else {
-            // Si hay algo en la fila pero no coincide, lo contamos como WIP por defecto
-            golesMap[goalId].wip++;
+        if (valueF !== "") {
+            golesMap[goalId].hasDataInF = true;
+            if (valueF_UPPER.includes("QA INSP RWK")) {
+                golesMap[goalId].qaInspRwk++;
+            }
         }
         
         validRows.push(row);
     });
 
-    return { goals: Object.values(golesMap), validRows };
+    // Solo se toman modelos que tengan ALGÚN dato en la Columna F
+    const goals = Object.values(golesMap).filter(g => g.hasDataInF);
+
+    // Calcular las unidades restantes (Total - QA INSP RWK)
+    goals.forEach(g => {
+        g.restantes = g.total - g.qaInspRwk;
+    });
+
+    return { goals, validRows };
 }
 
 function formatDate(excelDate) {
@@ -1281,102 +1278,47 @@ function formatDate(excelDate) {
 function renderGolesTable(golesData) {
     const body = document.getElementById('golesBody');
     const foot = document.getElementById('golesFoot');
-    const qaBody = document.getElementById('qaBody');
-    const qaFoot = document.getElementById('qaFoot');
     
-    if (!body || !foot || !qaBody || !qaFoot) return;
+    if (!body || !foot) return;
 
     let htmlProd = "";
-    let htmlQa = "";
     
-    let totalRwk = 0, totalWip = 0, totalPass = 0, totalQa = 0;
-    let totalProd = 0;
+    let sumTotal = 0;
+    let sumQa = 0;
+    let sumRestantes = 0;
 
     const golesList = Array.isArray(golesData) ? golesData : (golesData.goals || []);
 
     golesList.forEach(goal => {
+        const t = parseInt(goal.total) || 0;
         const q = parseInt(goal.qaInspRwk) || 0;
-        const r = parseInt(goal.rwk) || 0;
-        const w = parseInt(goal.wip) || 0;
-        const p = parseInt(goal.pass) || 0;
+        const r = parseInt(goal.restantes) || 0;
         
-        const subProd = r + w + p;
+        sumTotal += t;
+        sumQa += q;
+        sumRestantes += r;
 
-        // Render Tabla 1: PRODUCCIÓN (Solo si hay RWK/WIP/PASS)
-        if (subProd > 0) {
-            const pPctPass = (p / subProd) * 100;
-            if (pPctPass < 100) {
-                totalRwk += r; totalWip += w; totalPass += p; totalProd += subProd;
-
-                const pr = ((r / subProd) * 100).toFixed(0);
-                const pw = ((w / subProd) * 100).toFixed(0);
-                const pp = pPctPass.toFixed(0);
-
-                const cr = `hsl(${Math.max(0, 140 - (parseFloat(pr) * 1.4))}, 100%, 70%)`;
-                const cw = `hsl(${Math.max(0, 140 - (parseFloat(pw) * 1.4))}, 100%, 70%)`;
-                const cp = `hsl(${Math.min(140, parseFloat(pp) * 1.4)}, 100%, 70%)`;
-
-                htmlProd += `<tr>
-                    <td style="text-align: left; padding-left: 10px !important;">${goal.description}</td>
-                    <td>${goal.date}</td>
-                    <td class="val-col">${r}</td>
-                    <td class="pct-col" style="background-color: ${cr};">${pr}%</td>
-                    <td class="val-col">${w}</td>
-                    <td class="pct-col" style="background-color: ${cw};">${pw}%</td>
-                    <td class="val-col">${p}</td>
-                    <td class="pct-col" style="background-color: ${cp};">${pp}%</td>
-                </tr>`;
-            }
-        }
-
-        // Render Tabla 2: QA (Solo si hay QA)
-        if (q > 0) {
-            totalQa += q;
-            const pctQa = subProd > 0 ? ((q / subProd) * 100).toFixed(0) : "100";
-            const cq = `hsl(${Math.max(0, 140 - (parseFloat(pctQa) * 1.4))}, 100%, 70%)`;
-
-            htmlQa += `<tr>
-                <td style="text-align: left; padding-left: 10px !important;">${goal.description}</td>
-                <td>${goal.date}</td>
-                <td class="val-col" style="background-color: #ffffff !important;">${q}</td>
-                <td class="pct-col" style="background-color: ${cq};">${pctQa}%</td>
-            </tr>`;
-        }
+        htmlProd += `<tr>
+            <td style="text-align: left; padding-left: 10px !important;">${goal.description}</td>
+            <td>${goal.date}</td>
+            <td class="val-col" style="font-weight: 700;">${t}</td>
+            <td class="val-col" style="color: #b91c1c; font-weight: 700; background-color: #fee2e2;">${q}</td>
+            <td class="val-col" style="color: #15803d; font-weight: 700; background-color: #dcfce7;">${r}</td>
+        </tr>`;
     });
 
-    // Finalizar Tabla 1
-    body.innerHTML = htmlProd || '<tr><td colspan="8" style="text-align:center; padding: 2rem;">No hay goles de producción pendientes.</td></tr>';
-    if (totalProd > 0) {
-        const gr = ((totalRwk / totalProd) * 100).toFixed(0);
-        const gw = ((totalWip / totalProd) * 100).toFixed(0);
-        const gp = ((totalPass / totalProd) * 100).toFixed(0);
-        const cgr = `hsl(${Math.max(0, 140 - (parseFloat(gr) * 1.4))}, 100%, 70%)`;
-        const cgw = `hsl(${Math.max(0, 140 - (parseFloat(gw) * 1.4))}, 100%, 70%)`;
-        const cgp = `hsl(${Math.min(140, parseFloat(gp) * 1.4)}, 100%, 70%)`;
-
+    body.innerHTML = htmlProd || '<tr><td colspan="5" style="text-align:center; padding: 2rem;">No se encontraron modelos con datos en la Columna F.</td></tr>';
+    
+    if (sumTotal > 0) {
         foot.innerHTML = `<tr class="total-row">
-            <td colspan="2" style="text-align: left; padding-left: 10px; font-weight: bold;">TOTAL PRODUCCIÓN</td>
-            <td class="val-col">${totalRwk}</td>
-            <td class="pct-col" style="background-color: ${cgr};">${gr}%</td>
-            <td class="val-col">${totalWip}</td>
-            <td class="pct-col" style="background-color: ${cgw};">${gw}%</td>
-            <td class="val-col">${totalPass}</td>
-            <td class="pct-col" style="background-color: ${cgp};">${gp}%</td>
+            <td colspan="2" style="text-align: left; padding-left: 10px; font-weight: bold;">TOTALES</td>
+            <td class="val-col" style="font-weight: 800;">${sumTotal}</td>
+            <td class="val-col" style="color: #b91c1c; font-weight: 800; background-color: #fca5a5;">${sumQa}</td>
+            <td class="val-col" style="color: #15803d; font-weight: 800; background-color: #86efac;">${sumRestantes}</td>
         </tr>`;
-    } else foot.innerHTML = "";
-
-    // Finalizar Tabla 2
-    qaBody.innerHTML = htmlQa || '<tr><td colspan="4" style="text-align:center; padding: 2rem;">No hay inspecciones QA registradas.</td></tr>';
-    if (totalQa > 0) {
-        const gpq = totalProd > 0 ? ((totalQa / totalProd) * 100).toFixed(0) : "100";
-        const cgq = `hsl(${Math.max(0, 140 - (parseFloat(gpq) * 1.4))}, 100%, 70%)`;
-
-        qaFoot.innerHTML = `<tr class="total-row">
-            <td colspan="2" style="text-align: left; padding-left: 10px; font-weight: bold;">TOTAL QA</td>
-            <td class="val-col" style="background-color: #ffffff !important; color: #000000 !important;">${totalQa}</td>
-            <td class="pct-col" style="background-color: ${cgq};">${gpq}%</td>
-        </tr>`;
-    } else qaFoot.innerHTML = "";
+    } else {
+        foot.innerHTML = "";
+    }
 }
 
 function processData() {

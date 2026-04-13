@@ -176,9 +176,9 @@
                 <section id="golesView" class="view hidden">
                     <div class="card">
                         <div class="card-header flex-header">
-                            <h3 class="card-title">Seguimiento de Goles de Producción</h3>
+                            <h3 class="card-title">Seguimiento de Goles (QA INSP RWK)</h3>
                             <button id="btnDownloadGoles" class="btn btn-secondary">
-                                <span class="btn-icon">Excel</span>
+                                <span class="btn-icon">📥</span>
                                 <span class="btn-text">Descargar Seguimiento</span>
                             </button>
                         </div>
@@ -186,47 +186,15 @@
                             <table class="goles-table" id="golesTable">
                                 <thead>
                                     <tr>
-                                        <th rowspan="2">Descripción</th>
-                                        <th rowspan="2">Fecha</th>
-                                        <th colspan="2" class="th-rwk">RWK</th>
-                                        <th colspan="2" class="th-wip">WIP</th>
-                                        <th colspan="2" class="th-pass">PASS</th>
-                                    </tr>
-                                    <tr>
-                                        <th class="sub-th">Cant</th>
-                                        <th class="sub-th">%</th>
-                                        <th class="sub-th">Cant</th>
-                                        <th class="sub-th">%</th>
-                                        <th class="sub-th">Cant</th>
-                                        <th class="sub-th">%</th>
+                                        <th>Descripción (Modelo)</th>
+                                        <th>Fecha</th>
+                                        <th>Total de Unidades</th>
+                                        <th class="th-qa">QA INSP RWK</th>
+                                        <th class="th-pass">Unidades Restantes</th>
                                     </tr>
                                 </thead>
                                 <tbody id="golesBody"></tbody>
                                 <tfoot id="golesFoot"></tfoot>
-                            </table>
-                        </div>
-
-                        <!-- Nueva Sección Separada para QA -->
-                        <div class="card-header mt-8" style="margin-top: 2rem; border-top: 1px solid var(--glass-border); padding-top: 2rem;">
-                            <h3 class="card-title">Seguimiento de Inspecciones QA</h3>
-                        </div>
-                        <div class="goles-table-container">
-                            <table class="goles-table" id="qaTable">
-                                <thead>
-                                    <tr>
-                                        <th>Descripción</th>
-                                        <th>Fecha</th>
-                                        <th colspan="2" class="th-qa">QA INSP RWK (Columna F)</th>
-                                    </tr>
-                                    <tr>
-                                        <th class="sub-th"></th>
-                                        <th class="sub-th"></th>
-                                        <th class="sub-th">Cant</th>
-                                        <th class="sub-th">%</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="qaBody"></tbody>
-                                <tfoot id="qaFoot"></tfoot>
                             </table>
                         </div>
                     </div>
@@ -273,7 +241,7 @@
         </main>
     </div>
 
-    <script src="app.js?v=5.3"></script>
+    <script src="app.js?v=5.4"></script>
 </body>
 
 </html>
