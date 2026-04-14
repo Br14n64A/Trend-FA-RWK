@@ -96,47 +96,9 @@ header {
     box-shadow: 0 6px 20px rgba(225, 29, 72, 0.5);
 }
 
-.file-status {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: rgba(15, 23, 42, 0.5);
-    padding: 0.3rem 0.6rem;
-    border-radius: 15px;
-    border: 1px solid var(--glass-border);
-}
+/* file-status styles moved to bottom of file (corrected) */
 
-.pulse {
-    width: 6px;
-    height: 6px;
 
-    background: var(--success);
-    border-radius: 50%;
-    box-shadow: 0 0 10px var(--success);
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.5;
-        transform: scale(1.2);
-    }
-
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-#statusText {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
 
 .btn-icon {
     display: none;
@@ -923,4 +885,164 @@ tr:hover td {
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--accent-primary);
-}
+}
+
+/* ══════════════════════════════════════════════
+   Glass Panel (used in visitor log card)
+   ══════════════════════════════════════════════ */
+.glass-panel {
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+}
+
+.glass-panel:hover {
+    border-color: rgba(225, 29, 72, 0.3);
+}
+
+/* ══════════════════════════════════════════════
+   Table Container (used in visitor log)
+   ══════════════════════════════════════════════ */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    scrollbar-width: thin;
+}
+
+/* ══════════════════════════════════════════════
+   History Section & Cards
+   ══════════════════════════════════════════════ */
+.history-section {
+    padding: 0;
+}
+
+#historyContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.history-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+    margin-bottom: 0;
+}
+
+.history-card:hover {
+    border-color: var(--accent-primary);
+}
+
+.history-card .card-header {
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.history-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.history-table-container {
+    padding: 1rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 2px;
+}
+
+.history-table th {
+    background: #475569;
+    color: white;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.history-table td {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.6rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.history-table .model-col {
+    background: rgba(148, 163, 184, 0.2);
+    text-align: left;
+    padding-left: 1rem;
+    font-weight: 600;
+}
+
+.history-table .total-row td {
+    background: #cbd5e1 !important;
+    font-weight: 800;
+    border-top: 2px solid #94a3b8;
+}
+
+/* ══════════════════════════════════════════════
+   Fix: file-status text color for light mode
+   ══════════════════════════════════════════════ */
+.pulse {
+    width: 6px;
+    height: 6px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--success);
+    animation: pulse 1.5s infinite;
+    flex-shrink: 0;
+}
+
+@keyframes pulse {
+    0%   { opacity: 1; transform: scale(1); }
+    50%  { opacity: 0.5; transform: scale(1.2); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.file-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(15, 23, 42, 0.08);
+    padding: 0.3rem 0.6rem;
+    border-radius: 15px;
+    border: 1px solid var(--glass-border);
+}
+
+#statusText {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════
+   Goles section layout
+   ══════════════════════════════════════════════ */
+.goles-section {
+    padding: 0;
+}
+
+.goles-card {
+    width: 100%;
+}
+

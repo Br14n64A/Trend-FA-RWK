@@ -2,27 +2,23 @@
   "version": "5.6",
   "weekId": "2026-W16",
   "data": {
-    "MB": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
-    "NOGA": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
-    "JUPITER": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
-    "CORDITE": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
-    "UPDB": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
-    "MIDPLANE": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
-    "UC Module": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
-    "RISER": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
-    "SSD": { "LUNES": 0, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 }
+    "NOGA": { "LUNES": 249, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "JUPITER": { "LUNES": 129, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "CORDITE": { "LUNES": 62, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "UPDB": { "LUNES": 714, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "MIDPLANE": { "LUNES": 12, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "RISER": { "LUNES": 41, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 },
+    "SSD": { "LUNES": 67, "MARTES": 0, "MIERCOLES": 0, "JUEVES": 0, "VIERNES": 0 }
   },
   "prevFridayData": {
-    "MB": { "count": 1, "trend": "trend-equal" },
-    "NOGA": { "count": 201, "trend": "trend-up" },
-    "JUPITER": { "count": 123, "trend": "trend-down" },
-    "CORDITE": { "count": 38, "trend": "trend-up" },
-    "UPDB": { "count": 249, "trend": "trend-down" },
+    "NOGA": { "count": 210, "trend": "trend-up" },
+    "JUPITER": { "count": 106, "trend": "trend-down" },
+    "CORDITE": { "count": 61, "trend": "trend-up" },
+    "UPDB": { "count": 456, "trend": "trend-down" },
     "MIDPLANE": { "count": 15, "trend": "trend-equal" },
-    "RISER": { "count": 39, "trend": "trend-down" },
-    "SSD": { "count": 68, "trend": "trend-up" },
-    "UC Module": { "count": 16, "trend": "trend-equal" }
+    "RISER": { "count": 44, "trend": "trend-down" },
+    "SSD": { "count": 68, "trend": "trend-up" }
   },
   "history": [],
-  "stats": { "total": 0, "filtered": 0 }
+  "stats": { "total": 1274, "filtered": 1274 }
 }

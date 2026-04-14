@@ -317,7 +317,20 @@
         </main>
     </div>
 
-    <script src="app.js?v=5.2"></script>
+    <!-- 
+        ╔══════════════════════════════════════════════════════════╗
+        ║  CONFIGURACIÓN DE SERVIDOR AZURE                        ║
+        ║  Si el servidor PHP de Azure NO está en el mismo        ║
+        ║  directorio que este index.html, configura aquí el      ║
+        ║  URL base completo. Ejemplo:                            ║
+        ║  window.SERVER_BASE_URL = 'https://mi-app.azurewebsites.net'; ║
+        ║  Dejar vacío ('') usa URLs relativas (por defecto).     ║
+        ╚══════════════════════════════════════════════════════════╝
+    -->
+    <script>
+        window.SERVER_BASE_URL = ''; // <- Cambia esto si el PHP está en otro servidor
+    </script>
+    <script src="app.js?v=5.3"></script>
 </body>
 
 </html>

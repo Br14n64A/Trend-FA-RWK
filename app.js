@@ -1,7 +1,18 @@
 /**
- * PCBA Status Dashboard Logic - v3.0
+ * PCBA Status Dashboard Logic - v3.1
  * Supports manual upload, robust filtering, and MODEL_SERIAL mapping.
+ * Azure-compatible: uses SERVER_BASE_URL for server calls.
  */
+
+/**
+ * Returns the full URL for a PHP endpoint.
+ * Uses window.SERVER_BASE_URL if set (for Azure deployments where PHP is in a different base path).
+ * @param {string} endpoint - Relative endpoint name, e.g. 'data_handler.php'
+ */
+function getServerUrl(endpoint) {
+    const base = (window.SERVER_BASE_URL || '').replace(/\/$/, '');
+    return base ? `${base}/${endpoint}` : endpoint;
+}
 
 const MODEL_MAP = {
     "1A62RDC00-600-G": "Dove-A Riser",
@@ -441,7 +452,14 @@ async function loadStateFromServer() {
     if (isHttp) {
         updateStatus('Sincronizando con servidor...', 'info');
         try {
-            const response = await fetch('data_handler.php');
+            const serverUrl = getServerUrl('data_handler.php');
+            console.log('[loadStateFromServer] Conectando a:', serverUrl);
+            const response = await fetch(serverUrl);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const data = await response.json();
 
             if (data && !data.error) {
@@ -449,16 +467,25 @@ async function loadStateFromServer() {
                 localStorage.setItem('dashboard_storage', JSON.stringify(data)); // Keep local sync
                 await checkWeeklyReset();
                 restoreState();
-                updateStatus('Sincronizado (Servidor)', 'success');
+                updateStatus('✅ Sincronizado (Servidor Azure)', 'success');
                 return;
+            } else if (data && data.error) {
+                throw new Error('Servidor respondió con error: ' + data.error);
             }
         } catch (e) {
-            console.warn("Server fetch failed, falling back to local storage:", e);
+            console.error("[loadStateFromServer] Error al conectar con el servidor:", e);
+            // Mostrar advertencia clara de que se usará solo almacenamiento local
+            updateStatus('⚠️ Servidor no disponible — usando datos locales', 'error');
+            console.warn("IMPORTANTE: Los datos subidos en este dispositivo NO serán visibles en otros dispositivos hasta que el servidor PHP responda correctamente.");
+            console.warn("URL intentada:", getServerUrl('data_handler.php'));
+            console.warn("Si estás en Azure, verifica window.SERVER_BASE_URL en index.html");
         }
     }
 
     // Fallback/Standard Local Storage
-    updateStatus('Cargando memoria local...', 'info');
+    if (!window.dashboard_storage) {
+        updateStatus('Cargando memoria local...', 'info');
+    }
     try {
         const localData = localStorage.getItem('dashboard_storage');
         const data = localData ? JSON.parse(localData) : null;
@@ -467,15 +494,19 @@ async function loadStateFromServer() {
             window.dashboard_storage = data;
             await checkWeeklyReset();
             restoreState();
-            updateStatus('Memoria lista (Local)', 'success');
+            if (!window.location.protocol.startsWith('http')) {
+                updateStatus('Memoria lista (Local)', 'success');
+            }
         } else {
             await checkWeeklyReset();
-            updateStatus('Listo', 'success');
+            if (!window.location.protocol.startsWith('http')) {
+                updateStatus('Listo', 'success');
+            }
         }
     } catch (e) {
         console.error("Error loading local data:", e);
         await checkWeeklyReset();
-        updateStatus('Error de memoria', 'error');
+        updateStatus('Error de memoria local', 'error');
     }
 }
 
@@ -498,6 +529,9 @@ async function saveStateToServer() {
     if (stored.golesData && stored.golesData.goals) {
         stored.golesSummary = stored.golesData.goals;
     }
+    // Persist altoAgingData summary (lightweight — just the category counts, not source rows)
+    // altoAgingData is already a summary object like { "MAYOR A 90": { "NOGA": 3 } }
+    // so it doesn't need special pruning — just ensure it's included in the server payload.
 
     // 2. Persistent Local Storage for heavy data (not synced to server)
     try {
@@ -528,6 +562,8 @@ async function saveStateToServer() {
     }
 
     // 3. Create payload for server - EXCLUDE all heavy source arrays
+    // NOTE: altoAgingData (the rendered summary) is kept — it's lightweight.
+    // altoAgingSourceData (raw rows) is removed.
     const dataToSave = { ...stored };
     
     const keysToRemove = [
@@ -575,19 +611,27 @@ async function saveStateToServer() {
     // 4. Save to server if on HTTP
     if (window.location.protocol.startsWith('http')) {
         try {
-            const response = await fetch('data_handler.php', {
+            const serverUrl = getServerUrl('data_handler.php');
+            const response = await fetch(serverUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dataToSave)
             });
             if (!response.ok) {
-                // If still 413, we might need even more pruning
                 throw new Error(`Error HTTP: ${response.status}`);
             }
-            updateStatus('Sincronizado', 'success');
+            const result = await response.json();
+            if (result.success) {
+                updateStatus('✅ Guardado en servidor', 'success');
+            } else {
+                throw new Error(result.message || 'Error desconocido del servidor');
+            }
         } catch (e) {
             console.error("Error saving to server:", e);
-            const msg = e.message.includes('413') ? 'Error: Datos de Excel muy pesados' : 'Error de sincronización';
+            let msg = 'Error al guardar en servidor';
+            if (e.message.includes('413')) msg = '❌ Error: Datos muy pesados (413)';
+            else if (e.message.includes('404')) msg = '❌ PHP no encontrado (404) — verifica SERVER_BASE_URL';
+            else if (e.message.includes('403')) msg = '❌ Sin permisos en el servidor (403)';
             updateStatus(msg, 'error');
         }
     }
@@ -687,6 +731,7 @@ function switchView(viewId) {
         if (btnHistory) btnHistory.classList.add('active');
         btnGoles.classList.remove('active');
         renderHistory();
+        renderVisitorLog(); // Cargar registros de visitas al cambiar a historial
     }
 }
 
@@ -863,12 +908,12 @@ async function checkWeeklyReset() {
     stored.prevFridayData = stored.prevFridayData || {};
 
     const initialPrev = {
-        "NOGA": { count: 201, trend: "trend-up" },
-        "JUPITER": { count: 123, trend: "trend-down" },
-        "CORDITE": { count: 38, trend: "trend-up" },
-        "UPDB": { count: 249, trend: "trend-down" },
+        "NOGA": { count: 210, trend: "trend-up" },
+        "JUPITER": { count: 106, trend: "trend-down" },
+        "CORDITE": { count: 61, trend: "trend-up" },
+        "UPDB": { count: 456, trend: "trend-down" },
         "MIDPLANE": { count: 15, trend: "trend-equal" },
-        "RISER": { count: 39, trend: "trend-down" },
+        "RISER": { count: 44, "trend": "trend-down" },
         "SSD": { count: 68, trend: "trend-up" }
     };
 
@@ -2718,7 +2763,12 @@ async function exportToPPT() {
         }
 
         // --- SLIDE 7: GOLES ---
-        if (stored.golesData && stored.golesData.length > 0) {
+        // Normalize golesData: el nuevo formato es { goals: [], validRows: [] }, el legado es un array directo
+        const golesArray = (stored.golesData && stored.golesData.goals)
+            ? stored.golesData.goals
+            : (Array.isArray(stored.golesData) ? stored.golesData : []);
+
+        if (golesArray.length > 0) {
             const golesHeaders = [
                 { text: 'Descripción', options: { fill: '94a3b8', bold: true, color: 'ffffff' } },
                 { text: 'Fecha', options: { fill: '94a3b8', bold: true, color: 'ffffff' } },
@@ -2730,7 +2780,7 @@ async function exportToPPT() {
                 { text: 'PASS %', options: { fill: '15803d', bold: true, color: 'ffffff' } }
             ];
 
-            const filteredGoles = stored.golesData.filter(g => {
+            const filteredGoles = golesArray.filter(g => {
                 const total = g.rwk + g.wip + g.pass;
                 return total > 0 && ((g.pass / total) * 100) < 100;
             });
@@ -3074,7 +3124,8 @@ async function trackVisit() {
     }
 
     try {
-        const response = await fetch('track_visit.php', {
+        const trackUrl = getServerUrl('track_visit.php');
+        const response = await fetch(trackUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ visitor_id: visitorId })
@@ -3099,7 +3150,8 @@ async function renderVisitorLog() {
     if (!tableBody) return;
 
     try {
-        const response = await fetch('track_visit.php');
+        const trackUrl = getServerUrl('track_visit.php');
+        const response = await fetch(trackUrl);
         const logs = await response.json();
 
         if (!logs || logs.length === 0) {
