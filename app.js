@@ -708,10 +708,25 @@ function switchView(viewId) {
         if (btnHistory) btnHistory.classList.remove('active');
         btnDashboard.classList.add('active');
 
-        // Trigger chart resize when view becomes visible
-        Object.values(charts).forEach(chart => {
-            if (chart) chart.resize();
-        });
+        // Esperar un frame para que el navegador pinte el contenedor antes de renderizar/redimensionar
+        // Esto garantiza que Chart.js obtenga las dimensiones reales del canvas
+        setTimeout(() => {
+            const sd = window.dashboard_storage || {};
+            const hasRawData    = sd.entradasData || sd.salidasData || sd.firstData;
+            const hasSummary    = sd.entradasSummary || sd.salidasSummary || sd.firstSummary;
+            const chartsEmpty   = !charts.entradas && !charts.salidas;
+
+            if (chartsEmpty && (hasRawData || hasSummary)) {
+                // Gráficos no inicializados: renderizar desde los datos disponibles
+                console.log('[switchView] Gráficos vacíos — renderizando desde datos almacenados');
+                renderDashboard(sd.entradasData || [], sd.salidasData || [], sd.firstData || []);
+            } else {
+                // Gráficos ya existen: solo redimensionar para ajustar al contenedor visible
+                Object.values(charts).forEach(chart => {
+                    if (chart) chart.resize();
+                });
+            }
+        }, 50);
     } else if (viewId === 'goles') {
         summaryView.classList.add('hidden');
         chartsView.classList.add('hidden');
@@ -779,7 +794,12 @@ function restoreState() {
     renderSummaryTable();
 
     // Restore Charts and GOLES
-    if (stored.entradasData || stored.salidasData || stored.firstData) {
+    // Renderizar si hay datos fuente O resúmenes precomputados (caso de otro dispositivo
+    // que cargó desde el servidor: entradasData no existe pero entradasSummary sí)
+    const hasRawChartData  = stored.entradasData  || stored.salidasData  || stored.firstData;
+    const hasSummaryData   = stored.entradasSummary || stored.salidasSummary || stored.firstSummary;
+
+    if (hasRawChartData || hasSummaryData) {
         renderDashboard(stored.entradasData || [], stored.salidasData || [], stored.firstData || []);
     }
 
@@ -1518,9 +1538,16 @@ function renderDashboard(entradasData, salidasData, firstData) {
 function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, totalElementId, useRawModel = false) {
     let counts = {};
     let grandTotal = 0;
+    let skippedOther = 0;
 
     if (Array.isArray(data)) {
         // Handle raw array of rows
+        console.log(`[renderBarChart:${canvasId}] Procesando ${data.length} filas, columna de modelo: ${modelColIndex}`);
+        // Muestra las primeras 3 filas para diagnóstico
+        data.slice(0, 3).forEach((row, i) => {
+            console.log(`  Fila ${i} col[${modelColIndex}]:`, row[modelColIndex]);
+        });
+
         data.forEach(row => {
             const rawModel = String(row[modelColIndex] || 'Unknown').trim();
             if (!rawModel || rawModel.toUpperCase() === 'MODEL' || rawModel.toUpperCase() === 'ASSY PN' || rawModel.toUpperCase() === 'N/A' || rawModel.toUpperCase() === 'UNKNOWN') return;
@@ -1529,8 +1556,11 @@ function renderBarChart(canvasId, data, modelColIndex, label, color, chartKey, t
             if (useRawModel || category !== "OTHER") {
                 counts[category] = (counts[category] || 0) + 1;
                 grandTotal++;
+            } else {
+                skippedOther++;
             }
         });
+        console.log(`[renderBarChart:${canvasId}] Conteos finales:`, counts, `| Omitidos (OTHER): ${skippedOther} | Total: ${grandTotal}`);
     } else if (typeof data === 'object' && data !== null) {
         // Handle precomputed summary object { category: count }
         counts = data;
