@@ -1,34 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PCBA Status Dashboard</title>
+    <title>Dashboard PCBA Status - v5.2</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Library Loading: Local files first to avoid Edge Tracking Prevention issues -->
-    <script src="chart.js" onerror="console.warn('chart.js local failed')"></script>
-    <script src="xlsx.full.min.js" onerror="console.warn('xlsx local failed')"></script>
-    <script src="exceljs.min.js" onerror="console.warn('exceljs local failed')"></script>
-    <script src="pptxgen.bundle.js" onerror="console.warn('pptxgen local failed')"></script>
-    
-    <script>
-        window.addEventListener('load', () => {
-            const status = {
-                Chart: typeof Chart !== 'undefined',
-                XLSX: typeof XLSX !== 'undefined',
-                ExcelJS: typeof ExcelJS !== 'undefined',
-                PptxGenJS: typeof PptxGenJS !== 'undefined'
-            };
-            console.log('Library Load Status:', status);
-            
-            if (!status.Chart || !status.XLSX) {
-                console.warn('Algunas librerías no se pudieron cargar localmente.');
-            }
-        });
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="pptxgen.bundle.js"></script>
 </head>
 
 <body>
@@ -36,208 +19,238 @@
     <div class="background-decor blur-2"></div>
 
     <div class="app-container">
-        <header>
+        <header class="sticky-header">
             <div class="logo">
                 <img src="logo_ingrasys.png" alt="Ingrasys Logo" class="logo-img">
             </div>
-
+            
             <nav class="view-nav">
-                <button class="nav-btn active" id="btnSummary">Resumen Semanal</button>
-                <button class="nav-btn" id="btnDashboard">Dashboard de Gráficos</button>
-                <button class="nav-btn" id="btnGoles">GOLES</button>
-                <button class="nav-btn" id="btnHistory">Historial</button>
+                <button id="btnSummary" class="nav-btn active">
+                    <span class="btn-icon">🏠</span>
+                    <span class="btn-text">Resumen</span>
+                </button>
+                <button id="btnDashboard" class="nav-btn">
+                    <span class="btn-icon">📈</span>
+                    <span class="btn-text">Gráficos</span>
+                </button>
+                <button id="btnGoles" class="nav-btn">
+                    <span class="btn-icon">⚽</span>
+                    <span class="btn-text">Goles</span>
+                </button>
+                <button id="btnHistory" class="nav-btn">
+                    <span class="btn-icon">📜</span>
+                    <span class="btn-text">Historial</span>
+                </button>
             </nav>
 
             <div class="header-actions">
-                <div class="actions-group">
-                    <button class="nav-btn btn-excel" id="btnToggleEdit" title="Activar/Desactivar edición manual" data-active="false">
-                        <span class="btn-text">✏️ Modo Edición</span>
-                        <span class="btn-icon">✏️</span>
-                    </button>
-                    <button class="nav-btn btn-excel" id="btnExportPPT" title="Descargar reporte en PowerPoint">
-                        <span class="btn-text">📽️ Descargar PowerPoint</span>
-                        <span class="btn-icon">📽️</span>
-                    </button>
+                <div class="file-status" id="fileStatusBadge">
+                    <div class="pulse"></div>
+                    <span id="statusText">Cargando...</span>
                 </div>
-
-                <label for="fileUpload" class="upload-btn" title="Cargar Excel">
-                    <span>📁</span>
-                    <input type="file" id="fileUpload" accept=".xlsx, .xlsm" hidden>
+                
+                <label for="fileUpload" class="upload-btn" title="Cargar Datos Excel">
+                    <span class="btn-icon">📁</span>
+                    <span class="btn-text">Cargar Input Global</span>
                 </label>
-                <div class="file-status" id="fileStatus">
-                    <span class="pulse"></span>
-                    <span id="statusText" class="status-text-mobile-hide">Awaiting file...</span>
-                </div>
+                <input type="file" id="fileUpload" style="display: none;" accept=".xlsx, .xls">
             </div>
         </header>
 
-        <main>
+        <main class="main-content">
+            <div class="flex-between mb-1-5">
+                <h1 id="viewTitle" style="font-size: 1.5rem; font-weight: 700;">Resumen de Producción</h1>
+                <div id="currentWeekDisplay" class="pill" style="font-size: 0.9rem;">Semana Actual: Cargando...</div>
+            </div>
 
-            <div id="summaryView" class="view-content">
-                <section class="summary-section">
-                    <div class="card summary-card">
+            <div class="content-scrollable">
+                <div id="appStatus" class="app-status"></div>
+
+                <!-- Section: Summary Table -->
+                <section id="summaryView" class="view">
+                    <div class="actions-bar">
+                        <button id="btnToggleEdit" class="btn btn-secondary">
+                            <span class="btn-icon">✏️</span>
+                            <span class="btn-text">Modo Edición</span>
+                        </button>
+                        <button id="btnToggleDensity" class="btn btn-secondary">
+                            <span class="btn-icon">📏</span>
+                            <span class="btn-text">Vista Compacta</span>
+                        </button>
+                        <div class="export-group">
+                            <button id="btnExportPPT" class="btn btn-primary">
+                                <span class="btn-icon">📊</span>
+                                <span class="btn-text">Exportar Reporte (PPT)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
                         <div class="card-header">
-                            <h2>Resumen Semanal de Modelos</h2>
-                            <span class="pill" id="currentWeekPill">Semana</span>
+                            <h3 class="card-title">Producción Acumulada por Modelo</h3>
+                            <button id="btnDownloadSummary" class="btn-download" title="Descargar Origen">📥 DESCARGAR</button>
                         </div>
                         <div class="summary-table-container">
                             <table class="summary-table" id="summaryTable">
                                 <thead>
                                     <tr id="summaryHeader">
-                                        <!-- Dynamic headers -->
+                                        <th>CATEGORÍA</th>
+                                        <th>VIE ANT</th>
+                                        <th>LUNES</th>
+                                        <th>MARTES</th>
+                                        <th>MIERCOLES</th>
+                                        <th>JUEVES</th>
+                                        <th>VIERNES</th>
+                                        <th>DIF</th>
+                                        <th>TOTAL</th>
+                                        <th>ESTADO</th>
                                     </tr>
                                 </thead>
                                 <tbody id="summaryBody">
-                                    <!-- Grouped data -->
+                                    <!-- Dynamic rows -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </section>
-            </div>
 
-            <div id="chartsView" class="view-content hidden">
-                <section class="charts-grid-section">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">MRB por Modelo</h3>
+                            <div>
+                                <button id="btnDownloadMRBUnknown" class="btn-download" title="Descargar Desconocidos">❓ DESCONOCIDOS</button>
+                                <button id="btnDownloadMRB" class="btn-download" title="Descargar Tabla Actual">📥 DESCARGAR</button>
+                            </div>
+                        </div>
+                        <div class="mrb-table-container">
+                            <table class="mrb-table" id="mrbTable">
+                                <thead>
+                                    <tr id="mrbHeader">
+                                        <th>MODELO</th>
+                                        <th colspan="2">VIE ANT</th>
+                                        <th colspan="2">LUNES</th>
+                                        <th colspan="2">MARTES</th>
+                                        <th colspan="2">MIERCOLES</th>
+                                        <th colspan="2">JUEVES</th>
+                                        <th colspan="2">VIERNES</th>
+                                    </tr>
+                                    <tr id="mrbSubHeader">
+                                        <th></th>
+                                        <th>RWKFA</th>
+                                        <th>MRB</th>
+                                        <th>RWKFA</th>
+                                        <th>MRB</th>
+                                        <th>RWKFA</th>
+                                        <th>MRB</th>
+                                        <th>RWKFA</th>
+                                        <th>MRB</th>
+                                        <th>RWKFA</th>
+                                        <th>MRB</th>
+                                        <th>RWKFA</th>
+                                        <th>MRB</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mrbBody">
+                                    <tr><td colspan="13" style="text-align:center; padding: 2rem; color: #94a3b8;">No hay datos MRB disponibles.</td></tr>
+                                </tbody>
+                                <tfoot id="mrbFoot">
+                                    <!-- Totales row -->
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section: Charts & Detail Dashboard -->
+                <section id="chartsView" class="view hidden">
                     <div class="charts-grid">
-                        <!-- Entradas -->
                         <div class="card chart-card">
                             <div class="card-header">
-                                <h2>Entradas por Modelo</h2>
-                                <div class="header-tags">
-                                    <button class="nav-btn btn-excel" id="btnDownloadEntradas" title="Descargar datos originales de Entradas" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
-                                        <span class="btn-text">⬇️ Descargar Datos</span>
-                                        <span class="btn-icon">⬇️</span>
-                                    </button>
-                                    <span class="pill" id="entradasTotal">Total: 0</span>
-                                </div>
+                                <h3 class="card-title">Entradas Diarias</h3>
+                                <button id="btnDownloadEntradas" class="btn-download" title="Descargar Origen">📥 DESCARGAR</button>
                             </div>
                             <div class="chart-container">
                                 <canvas id="entradasChart"></canvas>
                             </div>
                         </div>
-
-                        <!-- Salidas -->
                         <div class="card chart-card">
                             <div class="card-header">
-                                <h2>Salidas por Modelo</h2>
-                                <div class="header-tags">
-                                    <button class="nav-btn btn-excel" id="btnDownloadSalidas" title="Descargar datos originales de Salidas" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
-                                        <span class="btn-text">⬇️ Descargar Datos</span>
-                                        <span class="btn-icon">⬇️</span>
-                                    </button>
-                                    <span class="pill" id="salidasTotal">Total: 0</span>
-                                </div>
+                                <h3 class="card-title">Salidas Diarias (Shipment)</h3>
+                                <button id="btnDownloadSalidas" class="btn-download" title="Descargar Origen">📥 DESCARGAR</button>
                             </div>
                             <div class="chart-container">
                                 <canvas id="salidasChart"></canvas>
                             </div>
                         </div>
-
+                        <div class="card chart-card">
+                            <div class="card-header">
+                                <h3 class="card-title">Distribución por Falla (FIRST)</h3>
+                                <button id="btnDownloadFirst" class="btn-download" title="Descargar Origen">📥 DESCARGAR</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="firstChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card chart-card">
+                            <div class="card-header">
+                                <h3 class="card-title">Top Fallas (SECOND)</h3>
+                                <button id="btnDownloadSecond" class="btn-download" title="Descargar Origen">📥 DESCARGAR</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="secondChart"></canvas>
+                            </div>
+                        </div>
                         <div class="card chart-card full-width">
                             <div class="card-header">
-                                <h2>FIRST (Fallas por Componente)</h2>
-                                <div class="header-tags">
-                                    <button class="nav-btn btn-excel" id="btnDownloadFirst" title="Descargar datos originales de FIRST" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
-                                        <span class="btn-text">⬇️ Descargar Datos</span>
-                                        <span class="btn-icon">⬇️</span>
-                                    </button>
-                                    <span class="pill" id="firstTotal">Total: 0</span>
-                                </div>
+                                <h3 class="card-title">Unidades en Alto Aging (>30 Días)</h3>
+                                <button id="btnDownloadAltoAgingWithoutMRB" class="btn-download" title="Descargar Excel">📥 DESCARGAR</button>
                             </div>
-                            <div class="first-content-layout">
-                                <div class="chart-container-compact">
-                                    <canvas id="firstChart"></canvas>
-                                </div>
-                                <div class="first-table-container">
-                                    <table class="compact-table" id="firstTable">
-                                        <tbody id="firstTableBody">
-                                            <!-- Data here -->
-                                        </tbody>
-                                    </table>
-
-                                </div>
+                            <div class="chart-container" style="height: 350px;">
+                                <canvas id="altoAgingWithoutMRBChart"></canvas>
                             </div>
-                        </div>
-
-
-
-                        <!-- Second Failure -->
-                        <div class="card chart-card full-width" id="secondCard">
-                            <div class="card-header">
-                                <h2>SECOND Failure (Fallas por Componente)</h2>
-                                <div class="header-tags">
-                                    <button class="nav-btn btn-excel" id="btnDownloadSecond" title="Descargar datos originales de SECOND" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
-                                        <span class="btn-text">⬇️ Descargar Datos</span>
-                                        <span class="btn-icon">⬇️</span>
-                                    </button>
-                                    <span class="pill" id="secondTotal">Total: 0</span>
-                                </div>
-                            </div>
-                            <div class="first-content-layout">
-                                <div class="chart-container-compact">
-                                    <canvas id="secondChart"></canvas>
-                                </div>
-                                <div class="first-table-container">
-                                    <table class="compact-table" id="secondTable">
-                                        <tbody id="secondTableBody">
-                                            <!-- Data here -->
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-
-
-                        <!-- Alto-Aging -->
-                        <div class="card chart-card full-width" id="altoAgingCard">
-                            <div class="card-header">
-                                <h2>Alto Aging por Modelo</h2>
-                                <div class="header-tags">
-                                    <button class="nav-btn btn-excel" id="btnDownloadAltoAging" title="Descargar datos originales de Alto Aging" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-right: 10px;">
-                                        <span class="btn-text">⬇️ Descargar Datos</span>
-                                        <span class="btn-icon">⬇️</span>
-                                    </button>
-                                    <span class="pill" id="altoAgingTotal">Total: 0</span>
-                                </div>
-                            </div>
-                            <div class="first-content-layout">
-                                <div class="chart-container-compact">
-                                    <canvas id="altoAgingChart"></canvas>
-                                </div>
-                                <div class="first-table-container">
-                                    <table class="compact-table" id="altoAgingTable">
+                            <div class="p-4" style="margin-top: 1rem;">
+                                <div class="table-container">
+                                    <table class="summary-table" style="font-size: 0.8rem;">
                                         <thead>
-                                            <tr id="altoAgingTableHeader">
-                                                <!-- Dynamic headers -->
-                                            </tr>
+                                            <tr id="altoAgingWithoutMRBTableHeader"></tr>
                                         </thead>
-                                        <tbody id="altoAgingTableBody">
-                                            <!-- Data here -->
-                                        </tbody>
-                                        <tfoot id="altoAgingTableFoot">
-                                            <!-- Total row -->
-                                        </tfoot>
+                                        <tbody id="altoAgingWithoutMRBTableBody"></tbody>
+                                        <tfoot id="altoAgingWithoutMRBTableFoot"></tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card chart-card full-width">
+                            <div class="card-header">
+                                <h3 class="card-title">Unidades en Alto Aging con MRB (con OWNER)</h3>
+                                <button id="btnDownloadAltoAgingWithMRB" class="btn-download" title="Descargar Excel">📥 DESCARGAR</button>
+                            </div>
+                            <div class="chart-container" style="height: 350px;">
+                                <canvas id="altoAgingWithMRBChart"></canvas>
+                            </div>
+                            <div class="p-4" style="margin-top: 1rem;">
+                                <div class="table-container">
+                                    <table class="summary-table" style="font-size: 0.8rem;">
+                                        <thead>
+                                            <tr id="altoAgingWithMRBTableHeader"></tr>
+                                        </thead>
+                                        <tbody id="altoAgingWithMRBTableBody"></tbody>
+                                        <tfoot id="altoAgingWithMRBTableFoot"></tfoot>
                                     </table>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </section>
-            </div>
 
-            <div id="golesView" class="view-content hidden">
-                <section class="goles-section">
-                    <div class="card goles-card">
-                        <div class="card-header">
-                            <h2>Seguimiento de Goles de Producción</h2>
-                            <div class="header-tags" style="display: flex; gap: 10px; align-items: center;">
-                                <button class="nav-btn btn-excel" id="btnDownloadGoles" title="Descargar datos originales de Goles" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
-                                    <span class="btn-text">⬇️ Descargar Datos</span>
-                                    <span class="btn-icon">⬇️</span>
-                                </button>
-                                <span class="pill">Hoja: Goles</span>
-                            </div>
+                <!-- Section: Goles Tracking -->
+                <section id="golesView" class="view hidden">
+                    <div class="card">
+                        <div class="card-header flex-header">
+                            <h3 class="card-title">Seguimiento de Goles de Producción</h3>
+                            <button id="btnDownloadGoles" class="btn btn-secondary">
+                                <span class="btn-icon">📥</span>
+                                <span class="btn-text">DESCARGAR</span>
+                            </button>
                         </div>
                         <div class="goles-table-container">
                             <table class="goles-table" id="golesTable">
@@ -258,42 +271,32 @@
                                         <th class="sub-th">%</th>
                                     </tr>
                                 </thead>
-                                <tbody id="golesBody">
-                                    <!-- Dynamic rows -->
-                                </tbody>
-                                <tfoot id="golesFoot">
-                                    <!-- Total row -->
-                                </tfoot>
+                                <tbody id="golesBody"></tbody>
+                                <tfoot id="golesFoot"></tfoot>
                             </table>
                         </div>
-                    </div>
                 </section>
-            </div>
 
-            <div id="historyView" class="view-content hidden">
-                <section class="history-section">
-                    <div id="historyContainer">
-                        <!-- History cards will be rendered here -->
+                <!-- Section: History View -->
+                <section id="historyView" class="view hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Resumen de Semanas Anteriores</h3>
+                        </div>
+                        <div id="historyContainer" class="history-grid">
+                            <!-- Weekly snapshots will be rendered here -->
+                             <p class="empty-msg">No hay historial disponible todavía.</p>
+                        </div>
                     </div>
 
-                    <!-- Visitor Tracking Section -->
-                    <div class="visitor-log-section">
-                        <div class="card glass-panel" style="padding: 1.5rem;">
-                            <h3 style="margin-bottom: 1.5rem; color: #e11d48;">Estadísticas de Visitantes (Anónimo)</h3>
-                            
-                            <div class="visitor-stats-summary" id="visitorStatsSummary">
-                                <div class="v-stat">
-                                    <span class="v-stat-label">Total de Visitas</span>
-                                    <span class="v-stat-value" id="vTotalVisits">-</span>
-                                </div>
-                                <div class="v-stat">
-                                    <span class="v-stat-label">Visitantes Únicos</span>
-                                    <span class="v-stat-value" id="vUniqueVisitors">-</span>
-                                </div>
-                            </div>
-
+                    <!-- Visitor Stats Card (Inside History/Admin) -->
+                    <div class="card mt-8" style="margin-top: 2rem;">
+                        <div class="card-header">
+                            <h3 class="card-title">Estadísticas de Tráfico (Historial de Visitas)</h3>
+                        </div>
+                        <div class="p-4">
                             <div class="table-container">
-                                <table class="visitor-table">
+                                <table class="summary-table">
                                     <thead>
                                         <tr>
                                             <th>Fecha/Hora</th>
@@ -312,25 +315,19 @@
                     </div>
                 </section>
             </div>
-
-
         </main>
     </div>
 
-    <!-- 
-        ╔══════════════════════════════════════════════════════════╗
-        ║  CONFIGURACIÓN DE SERVIDOR AZURE                        ║
-        ║  Si el servidor PHP de Azure NO está en el mismo        ║
-        ║  directorio que este index.html, configura aquí el      ║
-        ║  URL base completo. Ejemplo:                            ║
-        ║  window.SERVER_BASE_URL = 'https://mi-app.azurewebsites.net'; ║
-        ║  Dejar vacío ('') usa URLs relativas (por defecto).     ║
-        ╚══════════════════════════════════════════════════════════╝
-    -->
-    <script>
-        window.SERVER_BASE_URL = ''; // <- Cambia esto si el PHP está en otro servidor
-    </script>
-    <script src="app.js?v=5.3"></script>
+    <!-- Contenedor para Notificaciones Flotantes (Toasts) -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="js/config.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/upload.js"></script>
+    <script src="js/exports.js"></script>
+    <script src="js/main.js"></script>
 </body>
 
 </html>
